@@ -1,0 +1,216 @@
+# =============================================================================
+# Clippy Configuration — chat-rs workspace
+# Rust 1.85+ / Edition 2024
+# =============================================================================
+
+# -- MSRV -------------------------------------------------------------------
+# Disables lints for features unavailable before this version.
+msrv = "1.85"
+
+# -- Complexity & Size Thresholds -------------------------------------------
+
+# Max cognitive complexity per function (default: 25).
+# 30 is reasonable for server handlers and protocol logic that have
+# unavoidable match arms; tighter than the wild but not punishing.
+cognitive-complexity-threshold = 30
+
+# Max function parameters (default: 7). Keep it at 7 — if you need more,
+# introduce a config/options struct.
+too-many-arguments-threshold = 7
+
+# Max lines per function (default: 100). Server handlers can be verbose;
+# 120 gives headroom without letting functions become unmanageable.
+too-many-lines-threshold = 120
+
+# Max nesting depth (default: 0 = off). 6 catches deeply nested logic
+# without triggering on normal match-inside-if patterns.
+excessive-nesting-threshold = 6
+
+# Type complexity score (default: 250). Tokio/axum types get complex fast.
+# 300 avoids false positives on legitimate generic tower layers.
+type-complexity-threshold = 300
+
+# -- Boolean Limits ----------------------------------------------------------
+
+# Max bool params (default: 3). Two is the practical limit before you should
+# use an enum or builder.
+max-fn-params-bools = 3
+
+# Max bool fields in a struct (default: 3). Chat presence/status structs
+# may legitimately have a few booleans.
+max-struct-bools = 3
+
+# -- Size Thresholds (bytes) ------------------------------------------------
+
+# Max Future size (default: 16384). Critical for async — large futures bloat
+# task allocations. 16 KiB is the tokio-recommended ceiling.
+future-size-threshold = 16384
+
+# Max Err variant size (default: 128). Keep errors small; box large payloads.
+large-error-threshold = 128
+
+# Max stack array size (default: 16384). 16 KiB matches page size.
+array-size-threshold = 16384
+
+# Max function stack frame (default: 512000). 512 KiB is fine; tokio's
+# default task stack is 8 MiB.
+stack-size-threshold = 512000
+
+# Threshold for pass-by-value suggestions (default: 256).
+pass-by-value-size-limit = 256
+
+# Objects above this go on the heap (default: 200).
+too-large-for-stack = 200
+
+# Box<T> lint threshold (default: 128).
+unnecessary-box-size = 128
+
+# Vec<Box<T>> threshold (default: 4096).
+vec-box-size-threshold = 4096
+
+# -- Test Relaxations -------------------------------------------------------
+# Tests should be ergonomic. Allow panicking helpers and debug output.
+
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-dbg-in-tests = true
+allow-print-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-useless-vec-in-tests = true
+
+# -- Import Control ----------------------------------------------------------
+
+# Warn on ALL wildcard imports, including prelude re-exports.
+warn-on-all-wildcard-imports = true
+
+# -- Async Safety ------------------------------------------------------------
+
+# Types that must NOT be held across .await points.
+# MutexGuard is already caught by clippy; add project-specific types here.
+await-holding-invalid-types = [
+    # std::sync locks must never cross await boundaries
+    "std::sync::MutexGuard",
+    "std::sync::RwLockReadGuard",
+    "std::sync::RwLockWriteGuard",
+    # rusqlite Connection is not Send
+    "rusqlite::Connection",
+]
+
+# -- Disallowed Methods ------------------------------------------------------
+# Ban footgun methods in production code. Each entry has a reason shown in
+# the lint diagnostic.
+
+disallowed-methods = [
+    # Blocking I/O in async context
+    { path = "std::thread::sleep", reason = "Use tokio::time::sleep in async code" },
+    # Unbounded channels can OOM under load
+    { path = "tokio::sync::mpsc::unbounded_channel", reason = "Use bounded channel with backpressure" },
+    # Prefer tracing macros
+    { path = "std::io::stdout", reason = "Use tracing::{info,debug,...} instead of stdout" },
+    { path = "std::io::stderr", reason = "Use tracing::{warn,error,...} instead of stderr" },
+]
+
+# -- Disallowed Types --------------------------------------------------------
+
+disallowed-types = [
+    # std::sync::Mutex blocks the async runtime; use tokio::sync::Mutex
+    { path = "std::sync::Mutex", reason = "Use tokio::sync::Mutex for async code, or parking_lot::Mutex if sync is intentional" },
+]
+
+# -- Disallowed Macros -------------------------------------------------------
+
+disallowed-macros = [
+    { path = "std::println", reason = "Use tracing::{info,debug,...} for structured logging" },
+    { path = "std::eprintln", reason = "Use tracing::{warn,error,...} for structured logging" },
+    { path = "std::print", reason = "Use tracing::{info,debug,...} for structured logging" },
+    { path = "std::eprint", reason = "Use tracing::{warn,error,...} for structured logging" },
+]
+
+# -- Variable Names ----------------------------------------------------------
+
+# Extend (not replace) the default disallowed names.
+disallowed-names = ["foo", "baz", "quux", "toto", "tata", "titi", "temp", "tmp"]
+
+# -- Doc Lints ---------------------------------------------------------------
+
+# Additional words that doc_markdown should not flag as needing backticks.
+# Use ".." to keep the 65 built-in tech terms (e.g., "GitHub", "HTTP").
+doc-valid-idents = [
+    "..",
+    "WebSocket",
+    "WebSockets",
+    "SQLite",
+    "PostgreSQL",
+    "FFI",
+    "CDyLib",
+    "UUID",
+    "UUIDs",
+    "JSON",
+    "TOML",
+    "gRPC",
+    "OAuth",
+    "JWT",
+    "JWTs",
+    "HMAC",
+    "TLS",
+    "mTLS",
+    "API",
+    "APIs",
+    "SDK",
+    "SDKs",
+    "ORM",
+    "CRUD",
+    "ACL",
+    "ACLs",
+    "RBAC",
+    "PubSub",
+]
+
+# -- Interior Mutability Exceptions -----------------------------------------
+# Types that contain interior mutability but should be treated as immutable
+# by lints (e.g., borrow_interior_mutable_const).
+
+ignore-interior-mutability = [
+    "bytes::Bytes",
+]
+
+# -- API Stability -----------------------------------------------------------
+
+# Suppress lints that would require breaking public API changes.
+# Important for chat_protocol which is consumed by both client and server.
+avoid-breaking-exported-api = true
+
+# -- Unsafe Documentation ---------------------------------------------------
+
+accept-comment-above-attributes = true
+accept-comment-above-statement = true
+
+# -- Style Preferences -------------------------------------------------------
+
+# Allow mixed format args like format!("{x} {}", y) — useful during
+# incremental migration to inline format args.
+allow-mixed-uninlined-format-args = false
+
+# Enforce no needless raw string hashes.
+allow-one-hash-in-raw-strings = false
+
+# Enum variant names: require at least 3 variants before flagging prefix/suffix.
+enum-variant-name-threshold = 3
+
+# Struct field names: require at least 3 fields before flagging prefix/suffix.
+struct-field-name-threshold = 3
+
+# Literal readability.
+unreadable-literal-lint-fractions = true
+
+# Single-char bindings per scope (default: 4). Keep tight.
+single-char-binding-names-threshold = 4
+
+# -- Allowed Duplicate Crates -----------------------------------------------
+# Some transitive dependency trees pull in multiple versions. List them here
+# to suppress multiple_crate_versions for known cases.
+# allowed-duplicate-crates = []
+
+# -- Semicolon Placement (pedantic) -----------------------------------------
+semicolon-inside-block-ignore-singleline = true
+semicolon-outside-block-ignore-multiline = true

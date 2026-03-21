@@ -1,0 +1,41 @@
+/target
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE — VS Code shared configs are tracked, personal overrides are not
+.vscode/*.local.*
+.vscode/.ropeproject
+.vscode/history/
+
+# IDE — JetBrains
+.idea/
+*.iml
+
+# Claude Code
+.claude/*.local.json
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Coverage reports
+/coverage/
+
+# WASM build output
+/dist/
+
+# OS
+desktop.ini
+
+# Server config with secrets (example is tracked)
+config/config.toml
+!config/config.example.toml
+
+# Environment
+.env
+.env.*

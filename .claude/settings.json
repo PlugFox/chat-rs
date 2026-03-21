@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep *)",
+      "Bash(find * -name *.rs)",
+      "Bash(grep -n *)",
+      "Read(**/.cargo/**)",
+      "Bash(cargo test *)",
+      "Bash(cargo bench *)"
+    ]
+  }
+}

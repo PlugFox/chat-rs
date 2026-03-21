@@ -1,0 +1,62 @@
+# Chat Server Configuration
+# Copy to config/config.toml and adjust values.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+ws_send_buffer_size = 256 # max frames in WS send buffer per session
+
+[database]
+url = "postgres://chat:password@localhost/chat_db"
+max_connections = 20
+
+[auth]
+# Method 1 (optional) — token exchange via developer backend
+# exchange_url = "https://api.example.com/verify"
+# exchange_timeout_ms = 3000
+
+# Method 2 (recommended) — server-issued JWT
+jwt_secret = "CHANGE_ME_TO_A_SECURE_RANDOM_STRING"
+
+
+[limits]
+max_message_content_length = 4096 # characters
+max_extra_size = 4096             # bytes (JSON)
+max_frame_size = 32768            # bytes (32KB)
+max_rich_content_size = 8192      # bytes (BLOB)
+max_attachment_size = 52428800    # bytes (50MB)
+max_attachments_per_message = 10
+
+[rate_limits]
+connections_per_minute_per_ip = 10
+connections_burst = 3
+messages_per_minute_per_chat = 30
+messages_burst = 5
+commands_per_minute = 60
+commands_burst = 10
+
+[cluster]
+enabled = false
+# redis_url = "redis://localhost:6379"
+
+[webhooks]
+enabled = false
+# url = "https://api.example.com/chat/webhook"
+# secret = "hmac_secret"
+# events = ["message.created", "message.updated", "chat.created"]
+
+[storage]
+enabled = false
+# backend = "s3"
+# s3_bucket = "chat-media"
+# s3_region = "us-east-1"
+# s3_endpoint = "https://s3.amazonaws.com"
+# s3_access_key = ""
+# s3_secret_key = ""
+# max_file_size = 52428800
+# allowed_types = ["image/*", "video/*", "audio/*", "application/pdf"]
+# generate_thumbnails = true
+# thumbnail_max_dimension = 320
+
+[license]
+key = "" # empty = Free tier

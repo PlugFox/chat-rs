@@ -1,0 +1,84 @@
+[workspace]
+resolver = "2"
+members = ["crates/chat_protocol", "crates/chat_server", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+
+[workspace.dependencies]
+
+# Workspace crates
+chat_protocol = { path = "crates/chat_protocol" }
+
+# Async runtime
+tokio = { version = "1.50", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+
+# WebSocket
+tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
+
+# PostgreSQL (server)
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "migrate",
+    "uuid",
+    "chrono",
+    "macros",
+] }
+
+# Web framework (server)
+axum = { version = "0.8", features = ["ws"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "timeout"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.9.8"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Types & data
+bitflags = "2.11"
+bytes = "1.11"
+uuid = { version = "1.22", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Authentication
+jsonwebtoken = "10.3"
+
+# Rate limiting
+governor = "0.10"
+
+# Redis (Pro tier clustering)
+deadpool-redis = "0.23"
+
+# Logging & tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Testing
+proptest = "1.6"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+
+[profile.release-debug]
+inherits = "release"
+debug = true
+strip = "none"

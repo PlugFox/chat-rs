@@ -1,0 +1,146 @@
+{
+    "version": "0.2.0",
+    "inputs": [
+        {
+            "id": "testCrate",
+            "type": "pickString",
+            "description": "Select crate to test",
+            "options": [
+                "chat_protocol",
+                "chat_client",
+                "chat_server"
+            ],
+            "default": "chat_protocol"
+        },
+        {
+            "id": "testFilter",
+            "type": "promptString",
+            "description": "Test name filter (leave empty for all)",
+            "default": ""
+        }
+    ],
+    "configurations": [
+        // ── Server ─────────────────────────────────────────────
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Server: Debug",
+            "cargo": {
+                "args": ["build", "-p", "chat_server"],
+                "filter": {
+                    "name": "chat-server",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "chat_server=debug,chat_protocol=debug,tower_http=debug",
+                "RUST_BACKTRACE": "1"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Server: Release",
+            "cargo": {
+                "args": ["build", "-p", "chat_server", "--release"],
+                "filter": {
+                    "name": "chat-server",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "chat_server=info",
+                "RUST_BACKTRACE": "1"
+            }
+        },
+        // ── Tests ──────────────────────────────────────────────
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Test: chat_protocol (all)",
+            "cargo": {
+                "args": ["test", "-p", "chat_protocol", "--no-run"],
+                "filter": {
+                    "name": "chat_protocol",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Test: chat_client (all)",
+            "cargo": {
+                "args": ["test", "-p", "chat_client", "--no-run"],
+                "filter": {
+                    "name": "chat_client",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Test: chat_server (all)",
+            "cargo": {
+                "args": ["test", "-p", "chat_server", "--no-run"],
+                "filter": {
+                    "name": "chat_server",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Test: Selected crate (filtered)",
+            "cargo": {
+                "args": ["test", "-p", "${input:testCrate}", "--no-run"],
+                "filter": {
+                    "name": "${input:testCrate}",
+                    "kind": "lib"
+                }
+            },
+            "args": ["${input:testFilter}"],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
+        },
+        // ── xtask ──────────────────────────────────────────────
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "xtask: check",
+            "cargo": {
+                "args": ["build", "-p", "xtask"],
+                "filter": {
+                    "name": "xtask",
+                    "kind": "bin"
+                }
+            },
+            "args": ["check"],
+            "cwd": "${workspaceFolder}",
+            "env": {}
+        }
+    ]
+}

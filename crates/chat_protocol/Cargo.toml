@@ -1,0 +1,18 @@
+[package]
+name = "chat_protocol"
+description = "Chat SDK protocol types, codec, and error codes — shared between client and server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+bitflags = { workspace = true }
+bytes = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

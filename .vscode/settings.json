@@ -1,0 +1,61 @@
+{
+    // ── Editor ──────────────────────────────────────────────
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit",
+        "source.organizeImports": "explicit"
+    },
+    "editor.rulers": [
+        120
+    ],
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    // ── Rust / rust-analyzer ────────────────────────────────
+    "rust-analyzer.cargo.features": "all",
+    "rust-analyzer.check.command": "clippy",
+    "rust-analyzer.check.extraArgs": [
+        "--workspace"
+    ],
+    "rust-analyzer.linkedProjects": [
+        "Cargo.toml"
+    ],
+    "rust-analyzer.imports.granularity.group": "module",
+    "rust-analyzer.inlayHints.parameterHints.enable": false,
+    "rust-analyzer.inlayHints.chainingHints.enable": false,
+    // ── File associations ───────────────────────────────────
+    "files.associations": {
+        "*.ron": "ron"
+    },
+    // ── Search exclusions ───────────────────────────────────
+    "search.exclude": {
+        "**/target": true,
+        "**/dist": true,
+        "**/Cargo.lock": true,
+        "**/coverage": true
+    },
+    "files.exclude": {
+        "**/target": true,
+        "**/dist": true
+    },
+    // ── Terminal ─────────────────────────────────────────────
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    // ── Workbench ────────────────────────────────────────────
+    "workbench.colorCustomizations": {
+        "activityBar.activeBorder": "#4f46e5",
+        "activityBar.activeBackground": "#4f46e520"
+    },
+    // ── Git ──────────────────────────────────────────────────
+    "git.autofetch": true,
+    "git.confirmSync": false,
+    // ── Explorer ─────────────────────────────────────────────
+    "terminal.integrated.defaultProfile.osx": "zsh",
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+        "Cargo.toml": "Cargo.lock, rustfmt.toml, clippy.toml, .cargo",
+        ".env": ".env.*",
+        "README.md": "LICENSE, CHANGELOG.md, CONTRIBUTING.md, CLAUDE.md, ROADMAP.md, SPEC.md, AUTHORS.md"
+    }
+}

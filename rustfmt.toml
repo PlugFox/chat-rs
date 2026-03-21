@@ -1,0 +1,50 @@
+# =============================================================================
+# Rustfmt Configuration — chat-rs workspace
+# Rust 1.85+ / Edition 2024
+# Only stable options — no nightly-gated features.
+# =============================================================================
+
+# -- Edition & Layout ----------------------------------------------------------
+
+edition = "2024"
+max_width = 120
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Auto"
+
+# Auto-scales sub-widths (array_width, chain_width, fn_call_width, etc.)
+# proportionally to max_width. No need to set them individually.
+use_small_heuristics = "Default"
+
+# -- Code Organization --------------------------------------------------------
+
+reorder_imports = true
+reorder_modules = true
+
+# -- Code Simplification ------------------------------------------------------
+
+# Remove redundant nested parentheses.
+remove_nested_parens = true
+
+# Prefer `Foo { x }` over `Foo { x: x }`.
+use_field_init_shorthand = true
+
+# Prefer `expr?` over `try!(expr)`.
+use_try_shorthand = true
+
+# Merge multiple #[derive()] attributes into one.
+merge_derives = true
+
+# -- Formatting Choices --------------------------------------------------------
+
+# Require explicit ABI: `extern "C"` not bare `extern`.
+force_explicit_abi = true
+
+# No trailing comma after match block arms.
+match_block_trailing_comma = false
+
+# Never prepend `|` to first match arm pattern.
+match_arm_leading_pipes = "Never"
+
+# "Tall" — one param per line when the signature doesn't fit max_width.
+fn_params_layout = "Tall"

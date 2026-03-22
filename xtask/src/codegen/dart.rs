@@ -95,12 +95,26 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
         exports.push("src/protocol_constants.dart".into());
     }
 
+    // Codec files (Phase 4)
+    let codec_dir = output_dir.join("lib/src/codec");
+    write_file(&codec_dir.join("error.dart"), &emit_codec_error_dart())?;
+    write_file(&codec_dir.join("reader.dart"), &emit_reader_dart())?;
+    write_file(&codec_dir.join("writer.dart"), &emit_writer_dart())?;
+    write_file(&codec_dir.join("codecs.dart"), &emit_codecs_dart(ir))?;
+    write_file(&codec_dir.join("frame.dart"), &emit_frame_codec_dart(ir))?;
+
+    exports.push("src/codec/error.dart".into());
+    exports.push("src/codec/reader.dart".into());
+    exports.push("src/codec/writer.dart".into());
+    exports.push("src/codec/codecs.dart".into());
+    exports.push("src/codec/frame.dart".into());
+
     // Barrel export
     exports.sort();
     write_file(&lib_dir.join("chat_core.dart"), &emit_barrel(&exports))?;
 
     eprintln!(
-        "Dart: {} enums, {} bitflags, {} structs, {} tagged enums, {} constants",
+        "Dart: {} enums, {} bitflags, {} structs, {} tagged enums, {} constants + codec",
         ir.enums.len(),
         ir.bitflags.len(),
         ir.structs.len(),
@@ -757,6 +771,829 @@ fn emit_barrel(exports: &[String]) -> String {
 
     out
 }
+
+// ===========================================================================
+// Phase 4: Binary Codec Generation (Dart)
+// ===========================================================================
+
+/// Same dispatch table as TS (kind_name, flag, payload_type).
+/// 0=none, 1=struct, 2=tagged_enum, 3=vec_struct(u16), 4=ack.
+const FRAME_DISPATCH: &[(&str, u8, &str)] = &[
+    ("Hello", 1, "HelloPayload"),
+    ("Welcome", 1, "WelcomePayload"),
+    ("Ping", 0, ""),
+    ("Pong", 0, ""),
+    ("RefreshToken", 1, "RefreshTokenPayload"),
+    ("SendMessage", 1, "SendMessagePayload"),
+    ("EditMessage", 1, "EditMessagePayload"),
+    ("DeleteMessage", 1, "DeleteMessagePayload"),
+    ("ReadReceipt", 1, "ReadReceiptPayload"),
+    ("Typing", 1, "TypingPayload"),
+    ("GetPresence", 1, "GetPresencePayload"),
+    ("LoadChats", 2, "LoadChatsPayload"),
+    ("Search", 1, "SearchPayload"),
+    ("Subscribe", 1, "SubscribePayload"),
+    ("Unsubscribe", 1, "UnsubscribePayload"),
+    ("LoadMessages", 2, "LoadMessagesPayload"),
+    ("AddReaction", 1, "AddReactionPayload"),
+    ("RemoveReaction", 1, "RemoveReactionPayload"),
+    ("PinMessage", 1, "PinMessagePayload"),
+    ("UnpinMessage", 1, "UnpinMessagePayload"),
+    ("ForwardMessage", 1, "ForwardMessagePayload"),
+    ("MessageNew", 1, "Message"),
+    ("MessageEdited", 1, "Message"),
+    ("MessageDeleted", 1, "MessageDeletedPayload"),
+    ("ReceiptUpdate", 1, "ReceiptUpdatePayload"),
+    ("TypingUpdate", 1, "TypingUpdatePayload"),
+    ("MemberJoined", 1, "MemberJoinedPayload"),
+    ("MemberLeft", 1, "MemberLeftPayload"),
+    ("PresenceResult", 3, "PresenceEntry"),
+    ("ChatUpdated", 1, "ChatEntry"),
+    ("ChatCreated", 1, "ChatEntry"),
+    ("ReactionUpdate", 1, "ReactionUpdatePayload"),
+    ("UserUpdated", 1, "UserEntry"),
+    ("ChatDeleted", 1, "ChatDeletedPayload"),
+    ("MemberUpdated", 1, "MemberUpdatedPayload"),
+    ("Ack", 4, ""),
+    ("Error", 1, "ErrorPayload"),
+    ("CreateChat", 1, "CreateChatPayload"),
+    ("UpdateChat", 1, "UpdateChatPayload"),
+    ("DeleteChat", 1, "DeleteChatPayload"),
+    ("GetChatInfo", 1, "GetChatInfoPayload"),
+    ("GetChatMembers", 1, "GetChatMembersPayload"),
+    ("InviteMembers", 1, "InviteMembersPayload"),
+    ("UpdateMember", 1, "UpdateMemberPayload"),
+    ("LeaveChat", 1, "LeaveChatPayload"),
+    ("MuteChat", 1, "MuteChatPayload"),
+    ("UnmuteChat", 1, "UnmuteChatPayload"),
+    ("GetUser", 1, "GetUserPayload"),
+    ("GetUsers", 1, "GetUsersPayload"),
+    ("UpdateProfile", 1, "UpdateProfilePayload"),
+    ("BlockUser", 1, "BlockUserPayload"),
+    ("UnblockUser", 1, "UnblockUserPayload"),
+    ("GetBlockList", 1, "GetBlockListPayload"),
+];
+
+const SPECIAL_STRUCTS: &[&str] = &["ErrorPayload", "Message", "MessageBatch"];
+const SKIP_TAGGED_ENUMS: &[&str] = &["AckPayload", "FramePayload"];
+
+// --- Repr helpers ---
+
+fn repr_write(repr: ReprType) -> &'static str {
+    match repr {
+        ReprType::U8 => "writeU8",
+        ReprType::U16 => "writeU16",
+        ReprType::U32 => "writeU32",
+    }
+}
+
+fn repr_read(repr: ReprType) -> &'static str {
+    match repr {
+        ReprType::U8 => "readU8",
+        ReprType::U16 => "readU16",
+        ReprType::U32 => "readU32",
+    }
+}
+
+fn find_enum_repr(ir: &ParsedModule, name: &str) -> ReprType {
+    ir.enums.iter().find(|e| e.name == name).map(|e| e.repr).unwrap_or(ReprType::U8)
+}
+
+fn find_bitflags_repr(ir: &ParsedModule, name: &str) -> ReprType {
+    ir.bitflags.iter().find(|b| b.name == name).map(|b| b.repr).unwrap_or(ReprType::U32)
+}
+
+// --- Dart field encode/decode ---
+
+fn dart_emit_encode_field(
+    out: &mut String,
+    accessor: &str,
+    ty: &FieldType,
+    ir: &ParsedModule,
+    indent: &str,
+) {
+    match ty {
+        FieldType::U8 => writeln!(out, "{indent}w.writeU8({accessor});").unwrap(),
+        FieldType::U16 => writeln!(out, "{indent}w.writeU16({accessor});").unwrap(),
+        FieldType::U32 => writeln!(out, "{indent}w.writeU32({accessor});").unwrap(),
+        FieldType::I64 => writeln!(out, "{indent}w.writeTimestamp({accessor});").unwrap(),
+        FieldType::Bool => writeln!(out, "{indent}w.writeU8({accessor} ? 1 : 0);").unwrap(),
+        FieldType::String => writeln!(out, "{indent}w.writeString({accessor});").unwrap(),
+        FieldType::OptionalString => writeln!(out, "{indent}w.writeOptionalString({accessor});").unwrap(),
+        FieldType::UpdatableString => writeln!(out, "{indent}w.writeUpdatableString({accessor});").unwrap(),
+        FieldType::Uuid => writeln!(out, "{indent}w.writeUuid({accessor});").unwrap(),
+        FieldType::OptionalU32 => writeln!(out, "{indent}w.writeOptionU32({accessor});").unwrap(),
+        FieldType::VecU32 => {
+            writeln!(out, "{indent}w.writeU16({accessor}.length);").unwrap();
+            writeln!(out, "{indent}for (final v in {accessor}) {{ w.writeU32(v); }}").unwrap();
+        }
+        FieldType::VecU8 => {
+            writeln!(out, "{indent}w.writeU32({accessor}.length);").unwrap();
+            writeln!(out, "{indent}w.writeRawBytes({accessor});").unwrap();
+        }
+        FieldType::OptionalBytes => writeln!(out, "{indent}w.writeOptionalBytes({accessor});").unwrap(),
+        FieldType::VecString => {
+            writeln!(out, "{indent}w.writeU16({accessor}.length);").unwrap();
+            writeln!(out, "{indent}for (final v in {accessor}) {{ w.writeString(v); }}").unwrap();
+        }
+        FieldType::Enum(name) => {
+            let wfn = repr_write(find_enum_repr(ir, name));
+            writeln!(out, "{indent}w.{wfn}({accessor}.value);").unwrap();
+        }
+        FieldType::Bitflags(name) => {
+            let wfn = repr_write(find_bitflags_repr(ir, name));
+            writeln!(out, "{indent}w.{wfn}({accessor}.value);").unwrap();
+        }
+        FieldType::Struct(name) => writeln!(out, "{indent}encode{name}(w, {accessor});").unwrap(),
+        FieldType::OptionalStruct(name) => {
+            writeln!(out, "{indent}if ({accessor} != null) {{ w.writeU8(1); encode{name}(w, {accessor}!); }} else {{ w.writeU8(0); }}").unwrap();
+        }
+        FieldType::OptionalBitflags(name) => {
+            let wfn = repr_write(find_bitflags_repr(ir, name));
+            writeln!(out, "{indent}if ({accessor} != null) {{ w.writeU8(1); w.{wfn}({accessor}!.value); }} else {{ w.writeU8(0); }}").unwrap();
+        }
+        FieldType::OptionalVecStruct(name) => {
+            writeln!(out, "{indent}if ({accessor} != null) {{ w.writeU8(1); w.writeU32({accessor}!.length); for (final v in {accessor}!) {{ encode{name}(w, v); }} }} else {{ w.writeU8(0); }}").unwrap();
+        }
+        FieldType::VecStruct(name) => {
+            writeln!(out, "{indent}w.writeU32({accessor}.length);").unwrap();
+            writeln!(out, "{indent}for (final v in {accessor}) {{ encode{name}(w, v); }}").unwrap();
+        }
+        FieldType::TaggedEnum(name) => writeln!(out, "{indent}encode{name}(w, {accessor});").unwrap(),
+    }
+}
+
+fn dart_field_decode_expr(ty: &FieldType, ir: &ParsedModule) -> String {
+    match ty {
+        FieldType::U8 => "r.readU8()".into(),
+        FieldType::U16 => "r.readU16()".into(),
+        FieldType::U32 => "r.readU32()".into(),
+        FieldType::I64 => "r.readTimestamp()".into(),
+        FieldType::Bool => "r.readU8() != 0".into(),
+        FieldType::String => "r.readString()".into(),
+        FieldType::OptionalString => "r.readOptionalString()".into(),
+        FieldType::UpdatableString => "r.readUpdatableString()".into(),
+        FieldType::Uuid => "r.readUuid()".into(),
+        FieldType::OptionalU32 => "r.readOptionU32()".into(),
+        FieldType::VecU32 => "r.readVecU32()".into(),
+        FieldType::VecU8 => "r.readBytes(r.readU32())".into(),
+        FieldType::OptionalBytes => "r.readOptionalBytes()".into(),
+        FieldType::VecString => "r.readVecString()".into(),
+        FieldType::Enum(name) => {
+            let rfn = repr_read(find_enum_repr(ir, name));
+            format!("{name}.fromValue(r.{rfn}())!")
+        }
+        FieldType::Bitflags(name) => {
+            let rfn = repr_read(find_bitflags_repr(ir, name));
+            format!("{name}(r.{rfn}())")
+        }
+        FieldType::Struct(name) => format!("decode{name}(r)"),
+        FieldType::OptionalStruct(name) => format!("r.readU8() == 1 ? decode{name}(r) : null"),
+        FieldType::OptionalBitflags(name) => {
+            let rfn = repr_read(find_bitflags_repr(ir, name));
+            format!("r.readU8() == 1 ? {name}(r.{rfn}()) : null")
+        }
+        FieldType::OptionalVecStruct(name) => {
+            format!("r.readU8() == 1 ? r.readArray(r.readU32(), () => decode{name}(r)) : null")
+        }
+        FieldType::VecStruct(name) => format!("r.readArray(r.readU32(), () => decode{name}(r))"),
+        FieldType::TaggedEnum(name) => format!("decode{name}(r)"),
+    }
+}
+
+// --- Struct codec ---
+
+fn dart_emit_struct_codec(out: &mut String, s: &StructDef, ir: &ParsedModule) {
+    let name = &s.name;
+    writeln!(out, "void encode{name}(ProtocolWriter w, {name} v) {{").unwrap();
+    for f in &s.fields {
+        let accessor = format!("v.{}", to_camel_case(&f.name));
+        dart_emit_encode_field(out, &accessor, &f.ty, ir, "  ");
+    }
+    out.push_str("}\n\n");
+
+    writeln!(out, "{name} decode{name}(ProtocolReader r) {{").unwrap();
+    writeln!(out, "  return {name}(").unwrap();
+    for f in &s.fields {
+        let dart_name = to_camel_case(&f.name);
+        let expr = dart_field_decode_expr(&f.ty, ir);
+        writeln!(out, "    {dart_name}: {expr},").unwrap();
+    }
+    out.push_str("  );\n}\n");
+}
+
+fn dart_emit_error_payload_codec(out: &mut String) {
+    out.push_str(
+        "void encodeErrorPayload(ProtocolWriter w, ErrorPayload v) {\n\
+         \x20 w.writeU16(v.code.value);\n\
+         \x20 final slug = v.code.slug;\n\
+         \x20 w.writeU8(slug.length);\n\
+         \x20 for (var i = 0; i < slug.length; i++) { w.writeU8(slug.codeUnitAt(i)); }\n\
+         \x20 w.writeString(v.message);\n\
+         \x20 w.writeU32(v.retryAfterMs);\n\
+         \x20 w.writeOptionalString(v.extra);\n\
+         }\n\n\
+         ErrorPayload decodeErrorPayload(ProtocolReader r) {\n\
+         \x20 final codeRaw = r.readU16();\n\
+         \x20 final code = ErrorCode.fromValue(codeRaw);\n\
+         \x20 if (code == null) throw CodecError('unknown ErrorCode: $codeRaw');\n\
+         \x20 r.skip(r.readU8());\n\
+         \x20 return ErrorPayload(\n\
+         \x20   code: code,\n\
+         \x20   message: r.readString(),\n\
+         \x20   retryAfterMs: r.readU32(),\n\
+         \x20   extra: r.readOptionalString(),\n\
+         \x20 );\n\
+         }\n",
+    );
+}
+
+fn dart_emit_message_codec(out: &mut String) {
+    out.push_str(
+        "void encodeMessage(ProtocolWriter w, Message v) {\n\
+         \x20 w.writeU32(v.id);\n\
+         \x20 w.writeU32(v.chatId);\n\
+         \x20 w.writeU32(v.senderId);\n\
+         \x20 w.writeTimestamp(v.createdAt);\n\
+         \x20 w.writeTimestamp(v.updatedAt);\n\
+         \x20 w.writeU8(v.kind.value);\n\
+         \x20 w.writeU16(v.flags.value);\n\
+         \x20 w.writeOptionU32(v.replyToId);\n\
+         \x20 w.writeString(v.content);\n\
+         \x20 if (v.richContent != null) {\n\
+         \x20   final tmp = ProtocolWriter();\n\
+         \x20   tmp.writeU16(v.richContent!.length);\n\
+         \x20   for (final span in v.richContent!) { encodeRichSpan(tmp, span); }\n\
+         \x20   final blob = tmp.toBytes();\n\
+         \x20   w.writeU32(blob.length);\n\
+         \x20   w.writeRawBytes(blob);\n\
+         \x20 } else {\n\
+         \x20   w.writeU32(0);\n\
+         \x20 }\n\
+         \x20 w.writeOptionalString(v.extra);\n\
+         }\n\n\
+         Message decodeMessage(ProtocolReader r) {\n\
+         \x20 final id = r.readU32();\n\
+         \x20 final chatId = r.readU32();\n\
+         \x20 final senderId = r.readU32();\n\
+         \x20 final createdAt = r.readTimestamp();\n\
+         \x20 final updatedAt = r.readTimestamp();\n\
+         \x20 final kind = MessageKind.fromValue(r.readU8())!;\n\
+         \x20 final flags = MessageFlags(r.readU16());\n\
+         \x20 final replyToId = r.readOptionU32();\n\
+         \x20 final content = r.readString();\n\
+         \x20 final richLen = r.readU32();\n\
+         \x20 List<RichSpan>? richContent;\n\
+         \x20 if (richLen > 0) {\n\
+         \x20   final richData = r.readBytes(richLen);\n\
+         \x20   final rr = ProtocolReader(richData);\n\
+         \x20   richContent = rr.readArray(rr.readU16(), () => decodeRichSpan(rr));\n\
+         \x20 }\n\
+         \x20 final extra = r.readOptionalString();\n\
+         \x20 return Message(id: id, chatId: chatId, senderId: senderId, createdAt: createdAt, updatedAt: updatedAt, kind: kind, flags: flags, replyToId: replyToId, content: content, richContent: richContent, extra: extra);\n\
+         }\n",
+    );
+}
+
+fn dart_emit_message_batch_codec(out: &mut String) {
+    out.push_str(
+        "void encodeMessageBatch(ProtocolWriter w, MessageBatch v) {\n\
+         \x20 w.writeU8(v.hasMore ? 1 : 0);\n\
+         \x20 w.writeU32(v.messages.length);\n\
+         \x20 for (final msg in v.messages) { encodeMessage(w, msg); }\n\
+         }\n\n\
+         MessageBatch decodeMessageBatch(ProtocolReader r) {\n\
+         \x20 final hasMore = r.readU8() != 0;\n\
+         \x20 final messages = r.readArray(r.readU32(), () => decodeMessage(r));\n\
+         \x20 return MessageBatch(messages: messages, hasMore: hasMore);\n\
+         }\n",
+    );
+}
+
+// --- Tagged enum codec ---
+
+fn dart_emit_tagged_enum_codec(out: &mut String, t: &TaggedEnumDef, ir: &ParsedModule) {
+    let name = &t.name;
+    let base = name.strip_suffix("Payload").unwrap_or(name);
+
+    if name == "LoadMessagesPayload" {
+        dart_emit_load_messages_codec(out, t, ir);
+        return;
+    }
+
+    // encode
+    writeln!(out, "void encode{name}(ProtocolWriter w, {name} v) {{").unwrap();
+    out.push_str("  switch (v) {\n");
+    for (i, v) in t.variants.iter().enumerate() {
+        let class_name = format!("{base}{}", v.name);
+        let has_fields = !matches!(&v.kind, VariantKind::Unit);
+        if has_fields {
+            writeln!(out, "    case {class_name} p:").unwrap();
+        } else {
+            writeln!(out, "    case {class_name}():").unwrap();
+        }
+        writeln!(out, "      w.writeU8({i});").unwrap();
+        match &v.kind {
+            VariantKind::Unit => {}
+            VariantKind::Tuple(types) => {
+                for (j, ty) in types.iter().enumerate() {
+                    let field = if types.len() == 1 {
+                        format!("p.{}", tuple_field_name(ty))
+                    } else {
+                        format!("p.value{}", j + 1)
+                    };
+                    dart_emit_encode_field(out, &field, ty, ir, "      ");
+                }
+            }
+            VariantKind::Struct(fields) => {
+                for f in fields {
+                    let accessor = format!("p.{}", to_camel_case(&f.name));
+                    dart_emit_encode_field(out, &accessor, &f.ty, ir, "      ");
+                }
+            }
+        }
+    }
+    out.push_str("  }\n}\n\n");
+
+    // decode
+    writeln!(out, "{name} decode{name}(ProtocolReader r) {{").unwrap();
+    out.push_str("  final d = r.readU8();\n  return switch (d) {\n");
+    for (i, v) in t.variants.iter().enumerate() {
+        let class_name = format!("{base}{}", v.name);
+        match &v.kind {
+            VariantKind::Unit => {
+                writeln!(out, "    {i} => {class_name}(),").unwrap();
+            }
+            VariantKind::Tuple(types) => {
+                let fields: Vec<String> = types
+                    .iter()
+                    .enumerate()
+                    .map(|(j, ty)| {
+                        let fname = if types.len() == 1 {
+                            tuple_field_name(ty)
+                        } else {
+                            format!("value{}", j + 1)
+                        };
+                        format!("{}: {}", fname, dart_field_decode_expr(ty, ir))
+                    })
+                    .collect();
+                writeln!(out, "    {i} => {class_name}({}),", fields.join(", ")).unwrap();
+            }
+            VariantKind::Struct(fields) => {
+                let parts: Vec<String> = fields
+                    .iter()
+                    .map(|f| {
+                        format!(
+                            "{}: {}",
+                            to_camel_case(&f.name),
+                            dart_field_decode_expr(&f.ty, ir)
+                        )
+                    })
+                    .collect();
+                writeln!(out, "    {i} => {class_name}({}),", parts.join(", ")).unwrap();
+            }
+        }
+    }
+    writeln!(out, "    _ => throw CodecError('unknown {name} discriminant: $d'),").unwrap();
+    out.push_str("  };\n}\n");
+}
+
+fn dart_emit_load_messages_codec(out: &mut String, t: &TaggedEnumDef, ir: &ParsedModule) {
+    let name = &t.name;
+    let base = name.strip_suffix("Payload").unwrap_or(name);
+
+    // encode
+    writeln!(out, "void encode{name}(ProtocolWriter w, {name} v) {{").unwrap();
+    out.push_str("  switch (v) {\n");
+    for (i, v) in t.variants.iter().enumerate() {
+        let class_name = format!("{base}{}", v.name);
+        writeln!(out, "    case {class_name} p:").unwrap();
+        out.push_str("      w.writeU32(p.chatId);\n");
+        writeln!(out, "      w.writeU8({i});").unwrap();
+        if let VariantKind::Struct(fields) = &v.kind {
+            for f in fields {
+                if f.name == "chat_id" { continue; }
+                let accessor = format!("p.{}", to_camel_case(&f.name));
+                dart_emit_encode_field(out, &accessor, &f.ty, ir, "      ");
+            }
+        }
+    }
+    out.push_str("  }\n}\n\n");
+
+    // decode
+    writeln!(out, "{name} decode{name}(ProtocolReader r) {{").unwrap();
+    out.push_str("  final chatId = r.readU32();\n  final d = r.readU8();\n  return switch (d) {\n");
+    for (i, v) in t.variants.iter().enumerate() {
+        let class_name = format!("{base}{}", v.name);
+        if let VariantKind::Struct(fields) = &v.kind {
+            let parts: Vec<String> = fields
+                .iter()
+                .map(|f| {
+                    if f.name == "chat_id" {
+                        format!("{}: chatId", to_camel_case(&f.name))
+                    } else {
+                        format!("{}: {}", to_camel_case(&f.name), dart_field_decode_expr(&f.ty, ir))
+                    }
+                })
+                .collect();
+            writeln!(out, "    {i} => {class_name}({}),", parts.join(", ")).unwrap();
+        }
+    }
+    writeln!(out, "    _ => throw CodecError('unknown {name} mode: $d'),").unwrap();
+    out.push_str("  };\n}\n");
+}
+
+// --- Codecs file ---
+
+fn emit_codecs_dart(ir: &ParsedModule) -> String {
+    let mut out = String::from(HEADER);
+    // Import barrel (provides all types + codec utilities)
+    out.push_str("\nimport '../../chat_core.dart';\n\n");
+
+    // Struct codecs
+    for s in &ir.structs {
+        if SPECIAL_STRUCTS.contains(&s.name.as_str()) { continue; }
+        dart_emit_struct_codec(&mut out, s, ir);
+        out.push('\n');
+    }
+    if ir.structs.iter().any(|s| s.name == "ErrorPayload") {
+        dart_emit_error_payload_codec(&mut out);
+        out.push('\n');
+    }
+    if ir.structs.iter().any(|s| s.name == "Message") {
+        dart_emit_message_codec(&mut out);
+        out.push('\n');
+    }
+    if ir.structs.iter().any(|s| s.name == "MessageBatch") {
+        dart_emit_message_batch_codec(&mut out);
+        out.push('\n');
+    }
+
+    // Tagged enum codecs
+    for t in &ir.tagged_enums {
+        if SKIP_TAGGED_ENUMS.contains(&t.name.as_str()) { continue; }
+        dart_emit_tagged_enum_codec(&mut out, t, ir);
+        out.push('\n');
+    }
+
+    out
+}
+
+// --- Frame codec ---
+
+fn emit_frame_codec_dart(ir: &ParsedModule) -> String {
+    let mut out = String::from(HEADER);
+    out.push_str("\nimport 'dart:typed_data';\n\n");
+    out.push_str("import '../../chat_core.dart';\n\n");
+
+    // FrameHeader class
+    out.push_str(
+        "class FrameHeader {\n\
+         \x20 const FrameHeader({required this.kind, required this.seq, required this.eventSeq});\n\
+         \x20 final FrameKind kind;\n\
+         \x20 final int seq;\n\
+         \x20 final int eventSeq;\n\
+         }\n\n",
+    );
+
+    // FramePayload sealed class + variants
+    out.push_str("sealed class FramePayload {\n  const FramePayload();\n}\n\n");
+    for &(kind_name, flag, payload_type) in FRAME_DISPATCH {
+        let class_name = format!("FramePayload{kind_name}");
+        match flag {
+            0 => writeln!(out, "class {class_name} extends FramePayload {{\n  const {class_name}();\n}}").unwrap(),
+            4 => writeln!(out, "class {class_name} extends FramePayload {{\n  const {class_name}(this.data);\n  final Uint8List data;\n}}").unwrap(),
+            3 => writeln!(out, "class {class_name} extends FramePayload {{\n  const {class_name}(this.data);\n  final List<{payload_type}> data;\n}}").unwrap(),
+            _ => writeln!(out, "class {class_name} extends FramePayload {{\n  const {class_name}(this.data);\n  final {payload_type} data;\n}}").unwrap(),
+        }
+        out.push('\n');
+    }
+
+    // Frame class
+    out.push_str(
+        "class Frame {\n\
+         \x20 const Frame({required this.seq, required this.eventSeq, required this.payload});\n\
+         \x20 final int seq;\n\
+         \x20 final int eventSeq;\n\
+         \x20 final FramePayload payload;\n\
+         }\n\n",
+    );
+
+    // encodeFrameHeader / decodeFrameHeader
+    out.push_str(
+        "void encodeFrameHeader(ProtocolWriter w, FrameHeader h) {\n\
+         \x20 w.writeU8(h.kind.value);\n\
+         \x20 w.writeU32(h.seq);\n\
+         \x20 w.writeU32(h.eventSeq);\n\
+         }\n\n\
+         FrameHeader decodeFrameHeader(ProtocolReader r) {\n\
+         \x20 final kindByte = r.readU8();\n\
+         \x20 final kind = FrameKind.fromValue(kindByte);\n\
+         \x20 if (kind == null) throw CodecError('unknown FrameKind: $kindByte');\n\
+         \x20 return FrameHeader(kind: kind, seq: r.readU32(), eventSeq: r.readU32());\n\
+         }\n\n",
+    );
+
+    // FrameKind values from IR
+    let kind_values: std::collections::HashMap<&str, u64> = ir
+        .enums.iter().find(|e| e.name == "FrameKind")
+        .map(|e| e.variants.iter().map(|v| (v.name.as_str(), v.discriminant)).collect())
+        .unwrap_or_default();
+
+    // _framePayloadKind
+    out.push_str("FrameKind _framePayloadKind(FramePayload p) {\n  return switch (p) {\n");
+    for &(kind_name, _, _) in FRAME_DISPATCH {
+        let class_name = format!("FramePayload{kind_name}");
+        let dart_variant = to_lower_camel(kind_name);
+        writeln!(out, "    {class_name}() => FrameKind.{dart_variant},").unwrap();
+    }
+    out.push_str("  };\n}\n\n");
+
+    // encodeFrame
+    out.push_str("void encodeFrame(ProtocolWriter w, Frame frame) {\n");
+    out.push_str("  final kind = _framePayloadKind(frame.payload);\n");
+    out.push_str("  w.writeU8(kind.value);\n  w.writeU32(frame.seq);\n  w.writeU32(frame.eventSeq);\n");
+    out.push_str("  switch (frame.payload) {\n");
+    for &(kind_name, flag, payload_type) in FRAME_DISPATCH {
+        let class_name = format!("FramePayload{kind_name}");
+        match flag {
+            0 => writeln!(out, "    case {class_name}(): break;").unwrap(),
+            4 => writeln!(out, "    case {class_name} p: w.writeRawBytes(p.data);").unwrap(),
+            3 => {
+                let enc = format!("encode{payload_type}");
+                writeln!(out, "    case {class_name} p: w.writeU16(p.data.length); for (final e in p.data) {{ {enc}(w, e); }}").unwrap();
+            }
+            _ => {
+                let enc = format!("encode{payload_type}");
+                writeln!(out, "    case {class_name} p: {enc}(w, p.data);").unwrap();
+            }
+        }
+    }
+    out.push_str("  }\n}\n\n");
+
+    // decodeFrame
+    out.push_str("Frame decodeFrame(ProtocolReader r) {\n");
+    out.push_str("  final header = decodeFrameHeader(r);\n  late FramePayload payload;\n");
+    out.push_str("  switch (header.kind.value) {\n");
+    for &(kind_name, flag, payload_type) in FRAME_DISPATCH {
+        let class_name = format!("FramePayload{kind_name}");
+        if let Some(&val) = kind_values.get(kind_name) {
+            match flag {
+                0 => writeln!(out, "    case {val}: payload = {class_name}();").unwrap(),
+                4 => writeln!(out, "    case {val}: payload = {class_name}(r.remaining > 0 ? r.readBytes(r.remaining) : Uint8List(0));").unwrap(),
+                3 => {
+                    let dec = format!("decode{payload_type}");
+                    writeln!(out, "    case {val}: payload = {class_name}(r.readArray(r.readU16(), () => {dec}(r)));").unwrap();
+                }
+                _ => {
+                    let dec = format!("decode{payload_type}");
+                    writeln!(out, "    case {val}: payload = {class_name}({dec}(r));").unwrap();
+                }
+            }
+        }
+    }
+    out.push_str("    default: throw CodecError('unhandled FrameKind: ${header.kind.value}');\n");
+    out.push_str("  }\n  return Frame(seq: header.seq, eventSeq: header.eventSeq, payload: payload);\n}\n");
+
+    out
+}
+
+// --- Static templates ---
+
+fn emit_codec_error_dart() -> String {
+    format!(
+        "{HEADER}\n\
+         class CodecError implements Exception {{\n\
+         \x20 const CodecError(this.message);\n\
+         \x20 final String message;\n\
+         \x20 @override\n\
+         \x20 String toString() => 'CodecError: $message';\n\
+         }}\n"
+    )
+}
+
+fn emit_reader_dart() -> String {
+    format!(
+        "{HEADER}\n\
+import 'dart:convert';\n\
+import 'dart:typed_data';\n\
+\n\
+import 'error.dart';\n\
+\n\
+class ProtocolReader {{\n\
+  ProtocolReader(Uint8List data, [this._pos = 0])\n\
+      : _data = ByteData.sublistView(data),\n\
+        _bytes = data;\n\
+\n\
+  final ByteData _data;\n\
+  final Uint8List _bytes;\n\
+  int _pos;\n\
+\n\
+  int get remaining => _data.lengthInBytes - _pos;\n\
+\n\
+  void ensureRemaining(int n) {{\n\
+    if (remaining < n) throw CodecError('truncated: need $n bytes but only $remaining remain');\n\
+  }}\n\
+\n\
+  int readU8() {{ ensureRemaining(1); return _data.getUint8(_pos++); }}\n\
+\n\
+  int readU16() {{\n\
+    ensureRemaining(2);\n\
+    final v = _data.getUint16(_pos, Endian.little);\n\
+    _pos += 2;\n\
+    return v;\n\
+  }}\n\
+\n\
+  int readU32() {{\n\
+    ensureRemaining(4);\n\
+    final v = _data.getUint32(_pos, Endian.little);\n\
+    _pos += 4;\n\
+    return v;\n\
+  }}\n\
+\n\
+  int readI64() {{\n\
+    ensureRemaining(8);\n\
+    final v = _data.getInt64(_pos, Endian.little);\n\
+    _pos += 8;\n\
+    return v;\n\
+  }}\n\
+\n\
+  int readTimestamp() {{\n\
+    final v = readI64();\n\
+    if (v < 0 || v > 2199023255551) throw CodecError('timestamp out of range: $v');\n\
+    return v;\n\
+  }}\n\
+\n\
+  String readString() {{\n\
+    final len = readU32();\n\
+    if (len == 0) return '';\n\
+    ensureRemaining(len);\n\
+    final s = utf8.decode(_bytes.sublist(_pos, _pos + len));\n\
+    _pos += len;\n\
+    return s;\n\
+  }}\n\
+\n\
+  String? readOptionalString() {{\n\
+    final len = readU32();\n\
+    if (len == 0) return null;\n\
+    ensureRemaining(len);\n\
+    final s = utf8.decode(_bytes.sublist(_pos, _pos + len));\n\
+    _pos += len;\n\
+    return s;\n\
+  }}\n\
+\n\
+  Uint8List? readOptionalBytes() {{\n\
+    final len = readU32();\n\
+    if (len == 0) return null;\n\
+    ensureRemaining(len);\n\
+    final out = Uint8List.fromList(_bytes.sublist(_pos, _pos + len));\n\
+    _pos += len;\n\
+    return out;\n\
+  }}\n\
+\n\
+  String readUuid() {{\n\
+    ensureRemaining(16);\n\
+    final hex = StringBuffer();\n\
+    for (var i = 0; i < 16; i++) {{{{ hex.write(_bytes[_pos + i].toRadixString(16).padLeft(2, '0')); }}}}\n\
+    _pos += 16;\n\
+    final h = hex.toString();\n\
+    return '${{h.substring(0, 8)}}-${{h.substring(8, 12)}}-${{h.substring(12, 16)}}-${{h.substring(16, 20)}}-${{h.substring(20)}}';\n\
+  }}\n\
+\n\
+  int? readOptionU32() {{\n\
+    final flag = readU8();\n\
+    if (flag == 0) return null;\n\
+    if (flag == 1) return readU32();\n\
+    throw CodecError('invalid Option<u32> flag: $flag');\n\
+  }}\n\
+\n\
+  String? readUpdatableString() {{\n\
+    final flag = readU8();\n\
+    if (flag == 0) return null;\n\
+    if (flag == 1) return readString();\n\
+    throw CodecError('invalid updatable string flag: $flag');\n\
+  }}\n\
+\n\
+  Uint8List readBytes(int n) {{\n\
+    ensureRemaining(n);\n\
+    final out = Uint8List.fromList(_bytes.sublist(_pos, _pos + n));\n\
+    _pos += n;\n\
+    return out;\n\
+  }}\n\
+\n\
+  List<int> readVecU32() {{\n\
+    final count = readU16();\n\
+    return [for (var i = 0; i < count; i++) readU32()];\n\
+  }}\n\
+\n\
+  List<String> readVecString() {{\n\
+    final count = readU16();\n\
+    return [for (var i = 0; i < count; i++) readString()];\n\
+  }}\n\
+\n\
+  List<T> readArray<T>(int count, T Function() readOne) {{\n\
+    return [for (var i = 0; i < count; i++) readOne()];\n\
+  }}\n\
+\n\
+  void skip(int n) {{ ensureRemaining(n); _pos += n; }}\n\
+}}\n"
+    )
+}
+
+fn emit_writer_dart() -> String {
+    format!(
+        "{HEADER}\n\
+import 'dart:convert';\n\
+import 'dart:typed_data';\n\
+\n\
+import 'error.dart';\n\
+\n\
+class ProtocolWriter {{\n\
+  ProtocolWriter([int initialCapacity = 256])\n\
+      : _buf = Uint8List(initialCapacity),\n\
+        _data = ByteData(initialCapacity);\n\
+\n\
+  Uint8List _buf;\n\
+  ByteData _data;\n\
+  int _pos = 0;\n\
+\n\
+  void _grow(int needed) {{\n\
+    final required = _pos + needed;\n\
+    if (required <= _buf.length) return;\n\
+    var newLen = _buf.length * 2;\n\
+    while (newLen < required) {{{{ newLen *= 2; }}}}\n\
+    final next = Uint8List(newLen);\n\
+    next.setAll(0, _buf);\n\
+    _buf = next;\n\
+    _data = ByteData.sublistView(next);\n\
+  }}\n\
+\n\
+  void writeU8(int v) {{ _grow(1); _data.setUint8(_pos++, v); }}\n\
+\n\
+  void writeU16(int v) {{\n\
+    _grow(2); _data.setUint16(_pos, v, Endian.little); _pos += 2;\n\
+  }}\n\
+\n\
+  void writeU32(int v) {{\n\
+    _grow(4); _data.setUint32(_pos, v, Endian.little); _pos += 4;\n\
+  }}\n\
+\n\
+  void writeI64(int v) {{\n\
+    _grow(8); _data.setInt64(_pos, v, Endian.little); _pos += 8;\n\
+  }}\n\
+\n\
+  void writeTimestamp(int v) {{\n\
+    if (v < 0 || v > 2199023255551) throw CodecError('timestamp out of range: $v');\n\
+    writeI64(v);\n\
+  }}\n\
+\n\
+  void writeString(String v) {{\n\
+    if (v.isEmpty) {{ writeU32(0); return; }}\n\
+    final encoded = utf8.encode(v);\n\
+    writeU32(encoded.length);\n\
+    _grow(encoded.length);\n\
+    _buf.setAll(_pos, encoded);\n\
+    _pos += encoded.length;\n\
+  }}\n\
+\n\
+  void writeOptionalString(String? v) {{\n\
+    if (v == null) {{ writeU32(0); }} else {{ writeString(v); }}\n\
+  }}\n\
+\n\
+  void writeOptionalBytes(Uint8List? v) {{\n\
+    if (v == null) {{ writeU32(0); return; }}\n\
+    writeU32(v.length);\n\
+    _grow(v.length);\n\
+    _buf.setAll(_pos, v);\n\
+    _pos += v.length;\n\
+  }}\n\
+\n\
+  void writeUuid(String uuid) {{\n\
+    _grow(16);\n\
+    final hex = uuid.replaceAll('-', '');\n\
+    for (var i = 0; i < 16; i++) {{{{ _buf[_pos++] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16); }}}}\n\
+  }}\n\
+\n\
+  void writeOptionU32(int? v) {{\n\
+    if (v == null) {{ writeU8(0); }} else {{ writeU8(1); writeU32(v); }}\n\
+  }}\n\
+\n\
+  void writeUpdatableString(String? v) {{\n\
+    if (v == null) {{ writeU8(0); }} else {{ writeU8(1); writeString(v); }}\n\
+  }}\n\
+\n\
+  void writeRawBytes(Uint8List data) {{\n\
+    _grow(data.length);\n\
+    _buf.setAll(_pos, data);\n\
+    _pos += data.length;\n\
+  }}\n\
+\n\
+  Uint8List toBytes() => Uint8List.fromList(_buf.sublist(0, _pos));\n\
+}}\n"
+    )
+}
+
+// ===========================================================================
 
 fn emit_util() -> String {
     let mut out = String::from(HEADER);

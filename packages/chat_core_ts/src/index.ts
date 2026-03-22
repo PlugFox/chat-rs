@@ -1,6 +1,11 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+export * from './codec/codecs.js';
+export * from './codec/error.js';
+export * from './codec/frame.js';
+export * from './codec/reader.js';
+export * from './codec/writer.js';
 export * from './constants.js';
 export * from './types/ack-payload.js';
 export * from './types/add-reaction-payload.js';

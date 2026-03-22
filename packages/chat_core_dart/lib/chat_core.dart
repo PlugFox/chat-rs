@@ -4,6 +4,11 @@
 /// Chat protocol types and binary codec.
 library;
 
+export 'src/codec/codecs.dart';
+export 'src/codec/error.dart';
+export 'src/codec/frame.dart';
+export 'src/codec/reader.dart';
+export 'src/codec/writer.dart';
 export 'src/protocol_constants.dart';
 export 'src/types/ack_payload.dart';
 export 'src/types/add_reaction_payload.dart';

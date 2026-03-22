@@ -27,6 +27,7 @@ class ProtocolWriter {
     _growSlow(required);
   }
 
+  @pragma('vm:never-inline')
   void _growSlow(int required) {
     var newLen = _buf.length * 2;
     while (newLen < required) {
@@ -68,9 +69,14 @@ class ProtocolWriter {
   @pragma('vm:prefer-inline')
   void writeTimestamp(int v) {
     if (v < 0 || v > 2199023255551) {
-      throw CodecError('timestamp out of range: $v');
+      _throwTimestamp(v);
     }
     writeI64(v);
+  }
+
+  @pragma('vm:never-inline')
+  static Never _throwTimestamp(int v) {
+    throw CodecError('timestamp out of range: $v');
   }
 
   void writeString(String v) {
@@ -88,6 +94,8 @@ class ProtocolWriter {
   }
 
   /// Encode [v] as UTF-8 directly into [_buf] at [_pos]. No allocation.
+  /// Bounds are guaranteed by the caller via _grow(v.length * 3).
+  @pragma('vm:unsafe:no-bounds-checks')
   void _encodeUtf8Into(String v) {
     for (var i = 0; i < v.length; i++) {
       var c = v.codeUnitAt(i);
@@ -109,28 +117,27 @@ class ProtocolWriter {
             _buf[_pos++] = 0x80 | (c & 0x3F);
           } else {
             // Unpaired high surrogate — encode replacement char U+FFFD.
-            _writeReplacementChar();
+            _buf[_pos++] = 0xEF;
+            _buf[_pos++] = 0xBF;
+            _buf[_pos++] = 0xBD;
             i--; // re-process lo
           }
         } else {
-          _writeReplacementChar();
+          _buf[_pos++] = 0xEF;
+          _buf[_pos++] = 0xBF;
+          _buf[_pos++] = 0xBD;
         }
       } else if (c >= 0xDC00 && c <= 0xDFFF) {
         // Unpaired low surrogate.
-        _writeReplacementChar();
+        _buf[_pos++] = 0xEF;
+        _buf[_pos++] = 0xBF;
+        _buf[_pos++] = 0xBD;
       } else {
         _buf[_pos++] = 0xE0 | (c >> 12);
         _buf[_pos++] = 0x80 | ((c >> 6) & 0x3F);
         _buf[_pos++] = 0x80 | (c & 0x3F);
       }
     }
-  }
-
-  void _writeReplacementChar() {
-    // U+FFFD → EF BF BD
-    _buf[_pos++] = 0xEF;
-    _buf[_pos++] = 0xBF;
-    _buf[_pos++] = 0xBD;
   }
 
   @pragma('vm:prefer-inline')

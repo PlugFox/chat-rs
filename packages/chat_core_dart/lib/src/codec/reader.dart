@@ -17,8 +17,13 @@ class ProtocolReader {
   @pragma('vm:prefer-inline')
   void ensureRemaining(int n) {
     if (remaining < n) {
-      throw CodecError('truncated: need $n bytes but only $remaining remain');
+      _throwTruncated(n, remaining);
     }
+  }
+
+  @pragma('vm:never-inline')
+  static Never _throwTruncated(int need, int have) {
+    throw CodecError('truncated: need $need bytes but only $have remain');
   }
 
   @pragma('vm:prefer-inline')
@@ -55,9 +60,14 @@ class ProtocolReader {
   int readTimestamp() {
     final v = readI64();
     if (v < 0 || v > 2199023255551) {
-      throw CodecError('timestamp out of range: $v');
+      _throwTimestamp(v);
     }
     return v;
+  }
+
+  @pragma('vm:never-inline')
+  static Never _throwTimestamp(int v) {
+    throw CodecError('timestamp out of range: $v');
   }
 
   String readString() {
@@ -81,6 +91,8 @@ class ProtocolReader {
   /// Decode [len] bytes at current position as UTF-8.
   /// Fast path: if all bytes are ASCII, build string directly
   /// (skips UTF-8 validation, ~20% faster for short ASCII strings).
+  /// Bounds are guaranteed by the caller via ensureRemaining(len).
+  @pragma('vm:unsafe:no-bounds-checks')
   String _decodeUtf8(int len) {
     bool ascii = true;
     for (var i = 0; i < len; i++) {

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'error.dart';
@@ -71,27 +70,59 @@ class ProtocolWriter {
       writeU32(0);
       return;
     }
-    // Fast path: pure ASCII — avoid utf8.encode() allocation.
-    if (_isAscii(v)) {
-      writeU32(v.length);
-      _grow(v.length);
-      for (var i = 0; i < v.length; i++) {
-        _buf[_pos++] = v.codeUnitAt(i);
+    // Reserve space for the length prefix, fill it after encoding.
+    final lenOffset = reserve(4);
+    // Worst case: each UTF-16 code unit → 3 UTF-8 bytes.
+    _grow(v.length * 3);
+    final start = _pos;
+    _encodeUtf8Into(v);
+    patchU32(lenOffset, _pos - start);
+  }
+
+  /// Encode [v] as UTF-8 directly into [_buf] at [_pos]. No allocation.
+  void _encodeUtf8Into(String v) {
+    for (var i = 0; i < v.length; i++) {
+      var c = v.codeUnitAt(i);
+      if (c <= 0x7F) {
+        _buf[_pos++] = c;
+      } else if (c <= 0x7FF) {
+        _buf[_pos++] = 0xC0 | (c >> 6);
+        _buf[_pos++] = 0x80 | (c & 0x3F);
+      } else if (c >= 0xD800 && c <= 0xDBFF) {
+        // High surrogate — combine with next low surrogate for U+10000..U+10FFFF.
+        final hi = c;
+        if (++i < v.length) {
+          final lo = v.codeUnitAt(i);
+          if (lo >= 0xDC00 && lo <= 0xDFFF) {
+            c = 0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00);
+            _buf[_pos++] = 0xF0 | (c >> 18);
+            _buf[_pos++] = 0x80 | ((c >> 12) & 0x3F);
+            _buf[_pos++] = 0x80 | ((c >> 6) & 0x3F);
+            _buf[_pos++] = 0x80 | (c & 0x3F);
+          } else {
+            // Unpaired high surrogate — encode replacement char U+FFFD.
+            _writeReplacementChar();
+            i--; // re-process lo
+          }
+        } else {
+          _writeReplacementChar();
+        }
+      } else if (c >= 0xDC00 && c <= 0xDFFF) {
+        // Unpaired low surrogate.
+        _writeReplacementChar();
+      } else {
+        _buf[_pos++] = 0xE0 | (c >> 12);
+        _buf[_pos++] = 0x80 | ((c >> 6) & 0x3F);
+        _buf[_pos++] = 0x80 | (c & 0x3F);
       }
-    } else {
-      final encoded = utf8.encode(v);
-      writeU32(encoded.length);
-      _grow(encoded.length);
-      _buf.setAll(_pos, encoded);
-      _pos += encoded.length;
     }
   }
 
-  static bool _isAscii(String v) {
-    for (var i = 0; i < v.length; i++) {
-      if (v.codeUnitAt(i) > 0x7F) return false;
-    }
-    return true;
+  void _writeReplacementChar() {
+    // U+FFFD → EF BF BD
+    _buf[_pos++] = 0xEF;
+    _buf[_pos++] = 0xBF;
+    _buf[_pos++] = 0xBD;
   }
 
   void writeOptionalString(String? v) {

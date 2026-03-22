@@ -137,6 +137,25 @@ pub fn default_permissions(role: ChatRole, chat_kind: ChatKind) -> Permission {
     }
 }
 
+/// Lightweight last-message preview included in `ChatEntry`.
+///
+/// Wire format: 21-byte fixed header + content preview string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LastMessagePreview {
+    /// Message ID.
+    pub id: u32,
+    /// Sender's internal user ID.
+    pub sender_id: u32,
+    /// Creation timestamp, Unix seconds.
+    pub created_at: i64,
+    /// Content type.
+    pub kind: super::MessageKind,
+    /// Message property flags.
+    pub flags: super::MessageFlags,
+    /// Truncated plain-text preview (server-side, up to 100 bytes UTF-8).
+    pub content_preview: String,
+}
+
 /// A chat entry as transmitted on the wire (LoadChats, ChatCreated, ChatUpdated).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatEntry {
@@ -154,6 +173,8 @@ pub struct ChatEntry {
     pub title: Option<String>,
     /// Avatar URL. `None` when absent.
     pub avatar_url: Option<String>,
+    /// Last message preview. `None` for empty chats.
+    pub last_message: Option<LastMessagePreview>,
 }
 
 /// A chat member entry as transmitted on the wire (GetChatMembers response).

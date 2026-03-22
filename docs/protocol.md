@@ -26,23 +26,27 @@ All WS binary frames share a 5-byte header:
 | Ping    | 0x03  | both            | Keepalive                          |
 | Pong    | 0x04  | both            | Keepalive response                 |
 
-### Commands (0x10..0x1A, client → server)
+### Commands (0x10..0x1E, client → server)
 
-| Kind          | Value | Persist | Needs Ack |
-| ------------- | ----- | ------- | --------- |
-| SendMessage   | 0x10  | yes     | yes       |
-| EditMessage   | 0x11  | yes     | yes       |
-| DeleteMessage | 0x12  | yes     | yes       |
-| ReadReceipt   | 0x13  | yes     | no        |
-| Typing        | 0x14  | no      | no        |
-| GetPresence   | 0x15  | —       | rpc       |
-| LoadChats     | 0x16  | —       | rpc       |
-| Search        | 0x17  | —       | rpc       |
-| Subscribe     | 0x18  | —       | rpc       |
-| Unsubscribe   | 0x19  | —       | no        |
-| LoadMessages  | 0x1A  | —       | rpc       |
+| Kind           | Value | Persist | Needs Ack |
+| -------------- | ----- | ------- | --------- |
+| SendMessage    | 0x10  | yes     | yes       |
+| EditMessage    | 0x11  | yes     | yes       |
+| DeleteMessage  | 0x12  | yes     | yes       |
+| ReadReceipt    | 0x13  | yes     | no        |
+| Typing         | 0x14  | no      | no        |
+| GetPresence    | 0x15  | —       | rpc       |
+| LoadChats      | 0x16  | —       | rpc       |
+| Search         | 0x17  | —       | rpc       |
+| Subscribe      | 0x18  | —       | rpc       |
+| Unsubscribe    | 0x19  | —       | no        |
+| LoadMessages   | 0x1A  | —       | rpc       |
+| AddReaction    | 0x1B  | yes     | yes       |
+| RemoveReaction | 0x1C  | yes     | yes       |
+| PinMessage     | 0x1D  | yes     | yes       |
+| UnpinMessage   | 0x1E  | yes     | yes       |
 
-### Events (0x20..0x28, server → client)
+### Events (0x20..0x2A, server → client)
 
 | Kind           | Value | Purpose                                            |
 | -------------- | ----- | -------------------------------------------------- |
@@ -56,6 +60,7 @@ All WS binary frames share a 5-byte header:
 | PresenceResult | 0x27  | Response to GetPresence                            |
 | ChatUpdated    | 0x28  | Chat metadata changed (title, avatar)              |
 | ChatCreated    | 0x29  | New chat the user is a member of                   |
+| ReactionUpdate | 0x2A  | Reaction added or removed on a message             |
 
 ### Responses (0x30..0x31)
 
@@ -74,23 +79,25 @@ All WS binary frames share a 5-byte header:
 | GetChatInfo    | 0x43  | Get chat details                                 |
 | GetChatMembers | 0x44  | List chat members (paginated)                    |
 | InviteMembers  | 0x45  | Invite users                                     |
-| UpdateMember   | 0x46  | Kick, ban, mute, change role/permissions         |
+| UpdateMember   | 0x46  | Kick, ban, unban, mute, change role/permissions  |
 | LeaveChat      | 0x47  | Leave chat                                       |
 
-`UpdateMember` replaces the previous separate `KickMember`, `BanMember`, `MuteMember`,
-and `UpdateMemberRole` frames. The action is determined by an `action: u8` discriminant:
+### UpdateMember (0x46)
+
+Unified frame for member management. The action is determined by an `action: u8` discriminant:
 
 ```
 chat_id: u32 | user_id: u32 | action: u8 | action-specific payload
 ```
 
-| Action | Value | Payload             | Description                    |
-| ------ | ----- | ------------------- | ------------------------------ |
-| Kick   | 0     | (none)              | Remove member from chat        |
-| Ban    | 1     | (none)              | Ban member from chat           |
-| Mute   | 2     | `duration_secs: u32`| Mute (0 = unmute)              |
-| ChangeRole | 3 | `role: u8`          | Change member's role           |
-| UpdatePermissions | 4 | `permissions: u32` | Set permission override    |
+| Action            | Value | Payload              | Description                    |
+| ----------------- | ----- | -------------------- | ------------------------------ |
+| Kick              | 0     | (none)               | Remove member from chat        |
+| Ban               | 1     | (none)               | Ban member from chat           |
+| Mute              | 2     | `duration_secs: u32` | Mute (0 = unmute)              |
+| ChangeRole        | 3     | `role: u8`           | Change member's role           |
+| UpdatePermissions | 4     | `permissions: u32`   | Set permission override        |
+| Unban             | 5     | (none)               | Unban a previously banned user |
 
 Response: `Ack` (empty).
 
@@ -147,6 +154,15 @@ chat_id: u32 | kind: u8 | idempotency_key: UUID | content_len: u32 | content (UT
 `kind` is `MessageKind` (Text=0, Image=1, File=2, System=3). Defaults to `Text` if the
 client omits it (server-side default).
 
+### Typing (0x14)
+
+```
+chat_id: u32 | expires_in_ms: u16
+```
+
+`expires_in_ms` — how long this typing indicator is valid. Server forwards this value
+to other clients in `TypingUpdate`. Clients auto-expire the indicator after this duration.
+
 ### Event Payloads (server → client)
 
 **MessageNew (0x20)**: payload is a single `Message` (same wire format as in `MessageBatch`).
@@ -155,11 +171,40 @@ client omits it (server-side default).
 
 **MessageDeleted (0x22)**: `chat_id: u32`, `message_id: u32`. Content is already cleared server-side.
 
+**TypingUpdate (0x24)**: `chat_id: u32`, `user_id: u32`, `expires_in_ms: u16`.
+
+**MemberJoined (0x25)**: `chat_id: u32`, `user_id: u32`, `role: u8`, `invited_by: u32`.
+`invited_by = 0` means self-join (e.g. via invite link).
+
+**MemberLeft (0x26)**: `chat_id: u32`, `user_id: u32`.
+
+**ReactionUpdate (0x2A)**: `chat_id: u32`, `message_id: u32`, `user_id: u32`, `pack_id: u32`, `emoji_index: u8`, `added: u8` (1 = added, 0 = removed).
+
+### Reactions (0x1B..0x1C)
+
+**AddReaction (0x1B)**: `chat_id: u32`, `message_id: u32`, `pack_id: u32`, `emoji_index: u8`.
+Response: `Ack` (empty).
+
+**RemoveReaction (0x1C)**: same wire format as AddReaction.
+Response: `Ack` (empty).
+
+Reactions use a pack-based emoji system. `pack_id` identifies the emoji pack (0 = built-in
+Unicode set). Each pack contains up to 256 emoji (`emoji_index: u8`). The server broadcasts
+`ReactionUpdate` events to subscribed clients.
+
+### Pin/Unpin (0x1D..0x1E)
+
+**PinMessage (0x1D)**: `chat_id: u32`, `message_id: u32`.
+Response: `Ack` (empty). Server sets `MessageFlags::PINNED` and broadcasts `MessageEdited`.
+
+**UnpinMessage (0x1E)**: same wire format.
+Response: `Ack` (empty). Server clears `MessageFlags::PINNED` and broadcasts `MessageEdited`.
+
 ### Subscribe (0x18)
 
 `count: u16`, `chat_ids: [u32]`
 
-Batch-subscribes the session to receive real-time events for one or more chats (`MessageNew`, `MessageEdited`, `MessageDeleted`, `ReceiptUpdate`, `TypingUpdate`, `MemberJoined`, `MemberLeft`).
+Batch-subscribes the session to receive real-time events for one or more chats (`MessageNew`, `MessageEdited`, `MessageDeleted`, `ReceiptUpdate`, `TypingUpdate`, `MemberJoined`, `MemberLeft`, `ReactionUpdate`).
 
 Response: `Ack` (empty payload). No historical messages are pushed — client loads history explicitly via `LoadMessages`.
 
@@ -230,17 +275,30 @@ Response: `PresenceResult (0x27)` frame with the same seq. Payload: `count: u16`
 
 ### Search (0x17)
 
-`chat_id: u32`, `query: String`, `cursor: u32` (0 = first page), `limit: u16`
+```
+scope: u8 | scope_payload | query: String | cursor: u32 | limit: u16
+```
+
+Search scope is selected by `scope: u8` discriminant:
+
+| Scope  | Value | Payload        | Description                              |
+| ------ | ----- | -------------- | ---------------------------------------- |
+| Chat   | 0     | `chat_id: u32` | Search within a specific chat            |
+| Global | 1     | (none)         | Search across all chats user is member of|
+| User   | 2     | `user_id: u32` | Search messages from a specific user     |
+
+`cursor = 0` means first page.
 
 Response: `Ack` with payload: `next_cursor: u32`, then `count: u32` + `(message_id: u32, snippet_len: u32, snippet: UTF-8)` entries.
 
 ### UpdateChat (0x41)
 
-`chat_id: u32`, `title: String`, `avatar_url: String`
+```
+chat_id: u32 | title_flag: u8 [+ title: String] | avatar_flag: u8 [+ avatar_url: String]
+```
 
-**Clear semantics**: an empty string (`len = 0`) means "clear this field" (set to NULL).
-To leave a field unchanged, omit the update (send the current value). This avoids the
-need for a separate "clear" flag.
+Each field uses a `u8 flag` prefix: `0` = don't change, `1` = set to following string
+(empty string = clear the field, i.e. set to NULL on server).
 
 ## Versioning
 

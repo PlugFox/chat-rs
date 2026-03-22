@@ -186,7 +186,7 @@ keys (forward compatibility). Known conventions:
 | Key     | Present when    | Schema                                                                        |
 | ------- | --------------- | ----------------------------------------------------------------------------- |
 | `fwd`   | `FORWARDED` set | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32 }`                         |
-| `reply` | `REPLY` set     | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32, "text": "<= 100 bytes" }` |
+| `reply` | `REPLY` set     | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32, "quote": "<= 100 bytes" }` |
 
 ## Insertion (server-side)
 
@@ -259,7 +259,6 @@ flags        INTEGER NOT NULL DEFAULT 0,
 content      TEXT    NOT NULL,
 rich_content BLOB,
 extra        TEXT,
-reply_to_id  INTEGER,        -- planned (threads milestone)
 updated_at   INTEGER NOT NULL,
 PRIMARY KEY (chat_id, id)
 ```

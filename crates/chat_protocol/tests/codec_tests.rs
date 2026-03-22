@@ -28,7 +28,7 @@ mod unit {
     #[test]
     fn frame_kind_from_u8_unknown() {
         // 0x00, 0x05, 0xFF should all return None
-        for byte in [0x00, 0x05, 0x0F, 0x1B, 0x2A, 0x32, 0x4B, 0xFF] {
+        for byte in [0x00, 0x05, 0x0F, 0x1F, 0x2B, 0x32, 0x4B, 0xFF] {
             assert!(FrameKind::from_u8(byte).is_none(), "expected None for 0x{byte:02x}");
         }
     }
@@ -36,7 +36,7 @@ mod unit {
     #[test]
     fn frame_kind_all_count() {
         // Ensure all() returns the expected number of variants
-        assert_eq!(FrameKind::all().len(), 35);
+        assert_eq!(FrameKind::all().len(), 40);
     }
 
     // -- ErrorCode --
@@ -423,6 +423,7 @@ mod unit {
             updated_at: 1_711_100_100,
             title: Some("Test Group".into()),
             avatar_url: Some("https://example.com/avatar.png".into()),
+            last_message: None,
         };
         let mut buf = BytesMut::new();
         encode_chat_entry(&mut buf, &entry).unwrap();
@@ -441,12 +442,13 @@ mod unit {
             updated_at: 1_711_100_000,
             title: None,
             avatar_url: None,
+            last_message: None,
         };
         let mut buf = BytesMut::new();
         encode_chat_entry(&mut buf, &entry).unwrap();
 
-        // Minimum size: 4+1+1+8+8+4+4 = 30 bytes
-        assert_eq!(buf.len(), 30);
+        // Minimum size: 4+1+1+8+8+4+4+1(last_message flag) = 31 bytes
+        assert_eq!(buf.len(), 31);
 
         let decoded = decode_chat_entry(&mut buf).unwrap();
         assert_eq!(decoded, entry);
@@ -462,6 +464,7 @@ mod unit {
             updated_at: 1_711_100_000,
             title: Some("general".into()),
             avatar_url: None,
+            last_message: None,
         };
         let mut buf = BytesMut::new();
         encode_chat_entry(&mut buf, &entry).unwrap();
@@ -821,6 +824,7 @@ mod unit {
         let payload = TypingUpdatePayload {
             chat_id: 1,
             user_id: 42,
+            expires_in_ms: 5000,
         };
         let mut buf = BytesMut::new();
         encode_typing_update(&mut buf, &payload);
@@ -834,6 +838,8 @@ mod unit {
         let joined = MemberJoinedPayload {
             chat_id: 1,
             user_id: 42,
+            role: ChatRole::Member,
+            invited_by: 10,
         };
         let mut buf = BytesMut::new();
         encode_member_joined(&mut buf, &joined);
@@ -1405,6 +1411,7 @@ mod proptests {
                 updated_at,
                 title: title.filter(|s| !s.is_empty()),
                 avatar_url: avatar.filter(|s| !s.is_empty()),
+                last_message: None,
             };
             let mut buf = BytesMut::new();
             encode_chat_entry(&mut buf, &entry).unwrap();

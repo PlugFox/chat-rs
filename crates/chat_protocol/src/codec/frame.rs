@@ -60,6 +60,22 @@ pub fn encode_frame(buf: &mut impl BufMut, frame: &Frame) -> Result<(), CodecErr
             Ok(())
         }
         FramePayload::LoadMessages(p) => encode_load_messages(buf, p),
+        FramePayload::AddReaction(p) => {
+            encode_add_reaction(buf, p);
+            Ok(())
+        }
+        FramePayload::RemoveReaction(p) => {
+            encode_remove_reaction(buf, p);
+            Ok(())
+        }
+        FramePayload::PinMessage(p) => {
+            encode_pin_message(buf, p);
+            Ok(())
+        }
+        FramePayload::UnpinMessage(p) => {
+            encode_unpin_message(buf, p);
+            Ok(())
+        }
 
         FramePayload::MessageNew(msg) | FramePayload::MessageEdited(msg) => encode_message(buf, msg),
         FramePayload::MessageDeleted(p) => {
@@ -84,6 +100,10 @@ pub fn encode_frame(buf: &mut impl BufMut, frame: &Frame) -> Result<(), CodecErr
         }
         FramePayload::PresenceResult(entries) => encode_presence_result(buf, entries),
         FramePayload::ChatUpdated(e) | FramePayload::ChatCreated(e) => encode_chat_entry(buf, e),
+        FramePayload::ReactionUpdate(p) => {
+            encode_reaction_update(buf, p);
+            Ok(())
+        }
 
         FramePayload::Ack(_) => {
             // Ack payloads are context-dependent — encode_frame writes only the
@@ -154,6 +174,10 @@ pub fn decode_frame(buf: &mut impl Buf) -> Result<Frame, CodecError> {
         FrameKind::Subscribe => FramePayload::Subscribe(decode_subscribe(buf)?),
         FrameKind::Unsubscribe => FramePayload::Unsubscribe(decode_unsubscribe(buf)?),
         FrameKind::LoadMessages => FramePayload::LoadMessages(decode_load_messages(buf)?),
+        FrameKind::AddReaction => FramePayload::AddReaction(decode_add_reaction(buf)?),
+        FrameKind::RemoveReaction => FramePayload::RemoveReaction(decode_remove_reaction(buf)?),
+        FrameKind::PinMessage => FramePayload::PinMessage(decode_pin_message(buf)?),
+        FrameKind::UnpinMessage => FramePayload::UnpinMessage(decode_unpin_message(buf)?),
 
         FrameKind::MessageNew => FramePayload::MessageNew(decode_message(buf)?),
         FrameKind::MessageEdited => FramePayload::MessageEdited(decode_message(buf)?),
@@ -165,6 +189,7 @@ pub fn decode_frame(buf: &mut impl Buf) -> Result<Frame, CodecError> {
         FrameKind::PresenceResult => FramePayload::PresenceResult(decode_presence_result(buf)?),
         FrameKind::ChatUpdated => FramePayload::ChatUpdated(decode_chat_entry(buf)?),
         FrameKind::ChatCreated => FramePayload::ChatCreated(decode_chat_entry(buf)?),
+        FrameKind::ReactionUpdate => FramePayload::ReactionUpdate(decode_reaction_update(buf)?),
 
         FrameKind::Ack => {
             // Capture remaining bytes — caller decodes based on original request kind.

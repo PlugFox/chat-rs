@@ -210,12 +210,14 @@ pub fn decode_read_receipt(buf: &mut impl Buf) -> Result<ReadReceiptPayload, Cod
 /// Encode a `TypingPayload`.
 pub fn encode_typing(buf: &mut impl BufMut, p: &TypingPayload) {
     write_u32(buf, p.chat_id);
+    write_u16(buf, p.expires_in_ms);
 }
 
 /// Decode a `TypingPayload`.
 pub fn decode_typing(buf: &mut impl Buf) -> Result<TypingPayload, CodecError> {
     Ok(TypingPayload {
         chat_id: read_u32(buf)?,
+        expires_in_ms: read_u16(buf)?,
     })
 }
 
@@ -323,7 +325,19 @@ pub fn decode_load_chats(buf: &mut impl Buf) -> Result<LoadChatsPayload, CodecEr
 
 /// Encode a `SearchPayload`.
 pub fn encode_search(buf: &mut impl BufMut, p: &SearchPayload) {
-    write_u32(buf, p.chat_id);
+    match &p.scope {
+        SearchScope::Chat { chat_id } => {
+            write_u8(buf, 0);
+            write_u32(buf, *chat_id);
+        }
+        SearchScope::Global => {
+            write_u8(buf, 1);
+        }
+        SearchScope::User { user_id } => {
+            write_u8(buf, 2);
+            write_u32(buf, *user_id);
+        }
+    }
     write_string(buf, &p.query);
     write_u32(buf, p.cursor);
     write_u16(buf, p.limit);
@@ -331,12 +345,27 @@ pub fn encode_search(buf: &mut impl BufMut, p: &SearchPayload) {
 
 /// Decode a `SearchPayload`.
 pub fn decode_search(buf: &mut impl Buf) -> Result<SearchPayload, CodecError> {
-    let chat_id = read_u32(buf)?;
+    let scope_byte = read_u8(buf)?;
+    let scope = match scope_byte {
+        0 => SearchScope::Chat {
+            chat_id: read_u32(buf)?,
+        },
+        1 => SearchScope::Global,
+        2 => SearchScope::User {
+            user_id: read_u32(buf)?,
+        },
+        _ => {
+            return Err(CodecError::UnknownDiscriminant {
+                type_name: "SearchScope",
+                value: scope_byte as u32,
+            });
+        }
+    };
     let query = read_string(buf)?;
     let cursor = read_u32(buf)?;
     let limit = read_u16(buf)?;
     Ok(SearchPayload {
-        chat_id,
+        scope,
         query,
         cursor,
         limit,
@@ -510,6 +539,7 @@ pub fn encode_chat_entry(buf: &mut impl BufMut, e: &ChatEntry) -> Result<(), Cod
     write_timestamp(buf, e.updated_at)?;
     write_optional_string(buf, e.title.as_deref());
     write_optional_string(buf, e.avatar_url.as_deref());
+    encode_optional_last_message_preview(buf, e.last_message.as_ref())?;
     Ok(())
 }
 
@@ -526,6 +556,7 @@ pub fn decode_chat_entry(buf: &mut impl Buf) -> Result<ChatEntry, CodecError> {
     let updated_at = read_timestamp(buf)?;
     let title = read_optional_string(buf)?;
     let avatar_url = read_optional_string(buf)?;
+    let last_message = decode_optional_last_message_preview(buf)?;
 
     Ok(ChatEntry {
         id,
@@ -535,7 +566,58 @@ pub fn decode_chat_entry(buf: &mut impl Buf) -> Result<ChatEntry, CodecError> {
         updated_at,
         title,
         avatar_url,
+        last_message,
     })
+}
+
+fn encode_optional_last_message_preview(
+    buf: &mut impl BufMut,
+    preview: Option<&LastMessagePreview>,
+) -> Result<(), CodecError> {
+    match preview {
+        None => write_u8(buf, 0),
+        Some(p) => {
+            write_u8(buf, 1);
+            write_u32(buf, p.id);
+            write_u32(buf, p.sender_id);
+            write_timestamp(buf, p.created_at)?;
+            write_u8(buf, p.kind as u8);
+            write_u16(buf, p.flags.bits());
+            write_string(buf, &p.content_preview);
+        }
+    }
+    Ok(())
+}
+
+fn decode_optional_last_message_preview(buf: &mut impl Buf) -> Result<Option<LastMessagePreview>, CodecError> {
+    let flag = read_u8(buf)?;
+    match flag {
+        0 => Ok(None),
+        1 => {
+            let id = read_u32(buf)?;
+            let sender_id = read_u32(buf)?;
+            let created_at = read_timestamp(buf)?;
+            let kind_byte = read_u8(buf)?;
+            let kind = MessageKind::from_u8(kind_byte).ok_or(CodecError::UnknownDiscriminant {
+                type_name: "MessageKind",
+                value: kind_byte as u32,
+            })?;
+            let flags = MessageFlags::from_bits_truncate(read_u16(buf)?);
+            let content_preview = read_string(buf)?;
+            Ok(Some(LastMessagePreview {
+                id,
+                sender_id,
+                created_at,
+                kind,
+                flags,
+                content_preview,
+            }))
+        }
+        _ => Err(CodecError::UnknownDiscriminant {
+            type_name: "LastMessagePreview flag",
+            value: flag as u32,
+        }),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -683,6 +765,7 @@ pub fn decode_receipt_update(buf: &mut impl Buf) -> Result<ReceiptUpdatePayload,
 pub fn encode_typing_update(buf: &mut impl BufMut, p: &TypingUpdatePayload) {
     write_u32(buf, p.chat_id);
     write_u32(buf, p.user_id);
+    write_u16(buf, p.expires_in_ms);
 }
 
 /// Decode a `TypingUpdatePayload`.
@@ -690,6 +773,7 @@ pub fn decode_typing_update(buf: &mut impl Buf) -> Result<TypingUpdatePayload, C
     Ok(TypingUpdatePayload {
         chat_id: read_u32(buf)?,
         user_id: read_u32(buf)?,
+        expires_in_ms: read_u16(buf)?,
     })
 }
 
@@ -697,13 +781,25 @@ pub fn decode_typing_update(buf: &mut impl Buf) -> Result<TypingUpdatePayload, C
 pub fn encode_member_joined(buf: &mut impl BufMut, p: &MemberJoinedPayload) {
     write_u32(buf, p.chat_id);
     write_u32(buf, p.user_id);
+    write_u8(buf, p.role as u8);
+    write_u32(buf, p.invited_by);
 }
 
 /// Decode a `MemberJoinedPayload`.
 pub fn decode_member_joined(buf: &mut impl Buf) -> Result<MemberJoinedPayload, CodecError> {
+    let chat_id = read_u32(buf)?;
+    let user_id = read_u32(buf)?;
+    let role_byte = read_u8(buf)?;
+    let role = ChatRole::from_u8(role_byte).ok_or(CodecError::UnknownDiscriminant {
+        type_name: "ChatRole",
+        value: role_byte as u32,
+    })?;
+    let invited_by = read_u32(buf)?;
     Ok(MemberJoinedPayload {
-        chat_id: read_u32(buf)?,
-        user_id: read_u32(buf)?,
+        chat_id,
+        user_id,
+        role,
+        invited_by,
     })
 }
 
@@ -896,6 +992,7 @@ fn encode_member_action(buf: &mut impl BufMut, action: &MemberAction) {
             write_u8(buf, 4);
             write_u32(buf, perms.bits());
         }
+        MemberAction::Unban => write_u8(buf, 5),
     }
 }
 
@@ -920,6 +1017,7 @@ fn decode_member_action(buf: &mut impl Buf) -> Result<MemberAction, CodecError> 
             let perms = Permission::from_bits_truncate(read_u32(buf)?);
             Ok(MemberAction::UpdatePermissions(perms))
         }
+        5 => Ok(MemberAction::Unban),
         _ => Err(CodecError::UnknownDiscriminant {
             type_name: "MemberAction",
             value: action_byte as u32,
@@ -940,6 +1038,100 @@ pub fn encode_message_deleted(buf: &mut impl BufMut, p: &MessageDeletedPayload) 
 /// Decode a `MessageDeletedPayload`.
 pub fn decode_message_deleted(buf: &mut impl Buf) -> Result<MessageDeletedPayload, CodecError> {
     Ok(MessageDeletedPayload {
+        chat_id: read_u32(buf)?,
+        message_id: read_u32(buf)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Reactions
+// ---------------------------------------------------------------------------
+
+/// Encode an `AddReactionPayload`.
+pub fn encode_add_reaction(buf: &mut impl BufMut, p: &AddReactionPayload) {
+    write_u32(buf, p.chat_id);
+    write_u32(buf, p.message_id);
+    write_u32(buf, p.pack_id);
+    write_u8(buf, p.emoji_index);
+}
+
+/// Decode an `AddReactionPayload`.
+pub fn decode_add_reaction(buf: &mut impl Buf) -> Result<AddReactionPayload, CodecError> {
+    Ok(AddReactionPayload {
+        chat_id: read_u32(buf)?,
+        message_id: read_u32(buf)?,
+        pack_id: read_u32(buf)?,
+        emoji_index: read_u8(buf)?,
+    })
+}
+
+/// Encode a `RemoveReactionPayload`.
+pub fn encode_remove_reaction(buf: &mut impl BufMut, p: &RemoveReactionPayload) {
+    write_u32(buf, p.chat_id);
+    write_u32(buf, p.message_id);
+    write_u32(buf, p.pack_id);
+    write_u8(buf, p.emoji_index);
+}
+
+/// Decode a `RemoveReactionPayload`.
+pub fn decode_remove_reaction(buf: &mut impl Buf) -> Result<RemoveReactionPayload, CodecError> {
+    Ok(RemoveReactionPayload {
+        chat_id: read_u32(buf)?,
+        message_id: read_u32(buf)?,
+        pack_id: read_u32(buf)?,
+        emoji_index: read_u8(buf)?,
+    })
+}
+
+/// Encode a `ReactionUpdatePayload`.
+pub fn encode_reaction_update(buf: &mut impl BufMut, p: &ReactionUpdatePayload) {
+    write_u32(buf, p.chat_id);
+    write_u32(buf, p.message_id);
+    write_u32(buf, p.user_id);
+    write_u32(buf, p.pack_id);
+    write_u8(buf, p.emoji_index);
+    write_u8(buf, p.added as u8);
+}
+
+/// Decode a `ReactionUpdatePayload`.
+pub fn decode_reaction_update(buf: &mut impl Buf) -> Result<ReactionUpdatePayload, CodecError> {
+    Ok(ReactionUpdatePayload {
+        chat_id: read_u32(buf)?,
+        message_id: read_u32(buf)?,
+        user_id: read_u32(buf)?,
+        pack_id: read_u32(buf)?,
+        emoji_index: read_u8(buf)?,
+        added: read_u8(buf)? != 0,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Pin / Unpin
+// ---------------------------------------------------------------------------
+
+/// Encode a `PinMessagePayload`.
+pub fn encode_pin_message(buf: &mut impl BufMut, p: &PinMessagePayload) {
+    write_u32(buf, p.chat_id);
+    write_u32(buf, p.message_id);
+}
+
+/// Decode a `PinMessagePayload`.
+pub fn decode_pin_message(buf: &mut impl Buf) -> Result<PinMessagePayload, CodecError> {
+    Ok(PinMessagePayload {
+        chat_id: read_u32(buf)?,
+        message_id: read_u32(buf)?,
+    })
+}
+
+/// Encode an `UnpinMessagePayload`.
+pub fn encode_unpin_message(buf: &mut impl BufMut, p: &UnpinMessagePayload) {
+    write_u32(buf, p.chat_id);
+    write_u32(buf, p.message_id);
+}
+
+/// Decode an `UnpinMessagePayload`.
+pub fn decode_unpin_message(buf: &mut impl Buf) -> Result<UnpinMessagePayload, CodecError> {
+    Ok(UnpinMessagePayload {
         chat_id: read_u32(buf)?,
         message_id: read_u32(buf)?,
     })

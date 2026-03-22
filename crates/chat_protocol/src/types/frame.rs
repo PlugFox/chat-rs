@@ -42,6 +42,14 @@ pub enum FrameKind {
     Unsubscribe = 0x19,
     /// Load message history (RPC).
     LoadMessages = 0x1A,
+    /// Add a reaction to a message (needs Ack).
+    AddReaction = 0x1B,
+    /// Remove a reaction from a message (needs Ack).
+    RemoveReaction = 0x1C,
+    /// Pin a message in a chat (needs Ack).
+    PinMessage = 0x1D,
+    /// Unpin a message in a chat (needs Ack).
+    UnpinMessage = 0x1E,
 
     // Events (0x20..0x29, server → client)
     /// New message delivered in real-time. Payload: single `Message`.
@@ -64,6 +72,8 @@ pub enum FrameKind {
     ChatUpdated = 0x28,
     /// New chat the user is a member of. Payload: full `ChatEntry`.
     ChatCreated = 0x29,
+    /// Reaction added or removed on a message.
+    ReactionUpdate = 0x2A,
 
     // Responses (0x30..0x31)
     /// Command acknowledged.
@@ -110,6 +120,10 @@ impl FrameKind {
             0x18 => Some(Self::Subscribe),
             0x19 => Some(Self::Unsubscribe),
             0x1A => Some(Self::LoadMessages),
+            0x1B => Some(Self::AddReaction),
+            0x1C => Some(Self::RemoveReaction),
+            0x1D => Some(Self::PinMessage),
+            0x1E => Some(Self::UnpinMessage),
 
             0x20 => Some(Self::MessageNew),
             0x21 => Some(Self::MessageEdited),
@@ -121,6 +135,7 @@ impl FrameKind {
             0x27 => Some(Self::PresenceResult),
             0x28 => Some(Self::ChatUpdated),
             0x29 => Some(Self::ChatCreated),
+            0x2A => Some(Self::ReactionUpdate),
 
             0x30 => Some(Self::Ack),
             0x31 => Some(Self::Error),
@@ -156,6 +171,10 @@ impl FrameKind {
             Self::Subscribe,
             Self::Unsubscribe,
             Self::LoadMessages,
+            Self::AddReaction,
+            Self::RemoveReaction,
+            Self::PinMessage,
+            Self::UnpinMessage,
             Self::MessageNew,
             Self::MessageEdited,
             Self::MessageDeleted,
@@ -166,6 +185,7 @@ impl FrameKind {
             Self::PresenceResult,
             Self::ChatUpdated,
             Self::ChatCreated,
+            Self::ReactionUpdate,
             Self::Ack,
             Self::Error,
             Self::CreateChat,
@@ -336,6 +356,9 @@ pub struct ReadReceiptPayload {
 pub struct TypingPayload {
     /// Target chat.
     pub chat_id: u32,
+    /// How long this typing indicator is valid, in milliseconds.
+    /// Server and other clients use this to auto-expire the indicator.
+    pub expires_in_ms: u16,
 }
 
 /// GetPresence frame payload (client → server).
@@ -366,11 +389,22 @@ pub enum LoadChatsPayload {
     },
 }
 
+/// Search scope selector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchScope {
+    /// Search within a specific chat.
+    Chat { chat_id: u32 },
+    /// Search across all chats the user is a member of.
+    Global,
+    /// Search messages from a specific user across all chats.
+    User { user_id: u32 },
+}
+
 /// Search frame payload (client → server).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchPayload {
-    /// Chat to search in.
-    pub chat_id: u32,
+    /// Search scope.
+    pub scope: SearchScope,
     /// Search query string.
     pub query: String,
     /// Pagination cursor (0 = first page).
@@ -526,7 +560,7 @@ pub struct LeaveChatPayload {
 /// Action to perform on a chat member (used in `UpdateMember` frame).
 ///
 /// Wire format: `action: u8` discriminant + action-specific payload.
-/// Discriminant values: Kick=0, Ban=1, Mute=2, ChangeRole=3, UpdatePermissions=4.
+/// Discriminant values: Kick=0, Ban=1, Mute=2, ChangeRole=3, UpdatePermissions=4, Unban=5.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemberAction {
     /// Remove member from chat. Wire: action=0, no payload.
@@ -539,6 +573,8 @@ pub enum MemberAction {
     ChangeRole(super::ChatRole),
     /// Set explicit permission override. Wire: action=4, payload: `permissions: u32`.
     UpdatePermissions(super::Permission),
+    /// Unban a previously banned member. Wire: action=5, no payload.
+    Unban,
 }
 
 /// UpdateMember frame payload (client → server).
@@ -588,6 +624,8 @@ pub struct TypingUpdatePayload {
     pub chat_id: u32,
     /// User who is typing.
     pub user_id: u32,
+    /// How long this typing indicator is valid, in milliseconds.
+    pub expires_in_ms: u16,
 }
 
 /// MemberJoined event payload (server → client).
@@ -597,6 +635,10 @@ pub struct MemberJoinedPayload {
     pub chat_id: u32,
     /// User who joined.
     pub user_id: u32,
+    /// Role assigned to the new member.
+    pub role: super::ChatRole,
+    /// User who invited them. `0` = self-join (e.g. via invite link).
+    pub invited_by: u32,
 }
 
 /// MemberLeft event payload (server → client).
@@ -606,6 +648,71 @@ pub struct MemberLeftPayload {
     pub chat_id: u32,
     /// User who left.
     pub user_id: u32,
+}
+
+// --- Reaction payloads ---
+
+/// AddReaction frame payload (client → server).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AddReactionPayload {
+    /// Target chat.
+    pub chat_id: u32,
+    /// Target message.
+    pub message_id: u32,
+    /// Emoji pack ID (0 = built-in Unicode set).
+    pub pack_id: u32,
+    /// Emoji index within the pack (0–255).
+    pub emoji_index: u8,
+}
+
+/// RemoveReaction frame payload (client → server).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RemoveReactionPayload {
+    /// Target chat.
+    pub chat_id: u32,
+    /// Target message.
+    pub message_id: u32,
+    /// Emoji pack ID.
+    pub pack_id: u32,
+    /// Emoji index within the pack.
+    pub emoji_index: u8,
+}
+
+/// ReactionUpdate event payload (server → client).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReactionUpdatePayload {
+    /// Chat containing the message.
+    pub chat_id: u32,
+    /// Message that was reacted to.
+    pub message_id: u32,
+    /// User who added or removed the reaction.
+    pub user_id: u32,
+    /// Emoji pack ID.
+    pub pack_id: u32,
+    /// Emoji index within the pack.
+    pub emoji_index: u8,
+    /// `true` = reaction added, `false` = reaction removed.
+    pub added: bool,
+}
+
+// --- Pin/Unpin payloads ---
+
+/// PinMessage frame payload (client → server).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PinMessagePayload {
+    /// Target chat.
+    pub chat_id: u32,
+    /// Message to pin.
+    pub message_id: u32,
+}
+
+/// UnpinMessage frame payload (client → server).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnpinMessagePayload {
+    /// Target chat.
+    pub chat_id: u32,
+    /// Message to unpin.
+    pub message_id: u32,
 }
 
 /// Ack payload — command-specific response data.
@@ -673,6 +780,11 @@ pub enum FramePayload {
     Unsubscribe(UnsubscribePayload),
     LoadMessages(LoadMessagesPayload),
 
+    AddReaction(AddReactionPayload),
+    RemoveReaction(RemoveReactionPayload),
+    PinMessage(PinMessagePayload),
+    UnpinMessage(UnpinMessagePayload),
+
     // Events (server → client)
     MessageNew(super::Message),
     MessageEdited(super::Message),
@@ -684,6 +796,7 @@ pub enum FramePayload {
     PresenceResult(Vec<super::PresenceEntry>),
     ChatUpdated(super::ChatEntry),
     ChatCreated(super::ChatEntry),
+    ReactionUpdate(ReactionUpdatePayload),
 
     // Responses
     Ack(AckPayload),
@@ -719,6 +832,10 @@ impl FramePayload {
             Self::Subscribe(_) => FrameKind::Subscribe,
             Self::Unsubscribe(_) => FrameKind::Unsubscribe,
             Self::LoadMessages(_) => FrameKind::LoadMessages,
+            Self::AddReaction(_) => FrameKind::AddReaction,
+            Self::RemoveReaction(_) => FrameKind::RemoveReaction,
+            Self::PinMessage(_) => FrameKind::PinMessage,
+            Self::UnpinMessage(_) => FrameKind::UnpinMessage,
             Self::MessageNew(_) => FrameKind::MessageNew,
             Self::MessageEdited(_) => FrameKind::MessageEdited,
             Self::MessageDeleted(_) => FrameKind::MessageDeleted,
@@ -729,6 +846,7 @@ impl FramePayload {
             Self::PresenceResult(_) => FrameKind::PresenceResult,
             Self::ChatUpdated(_) => FrameKind::ChatUpdated,
             Self::ChatCreated(_) => FrameKind::ChatCreated,
+            Self::ReactionUpdate(_) => FrameKind::ReactionUpdate,
             Self::Ack(_) => FrameKind::Ack,
             Self::Error(_) => FrameKind::Error,
             Self::CreateChat(_) => FrameKind::CreateChat,

@@ -21,6 +21,7 @@ A **chat** is the container for messages and members. There are three kinds:
 | `avatar_url`  | `u32 len + UTF-8` | `Option<String>` | Avatar URL; absent when `len = 0`                 |
 | `created_at`  | `i64`             | `i64`            | Creation timestamp, Unix seconds (validated)      |
 | `updated_at`  | `i64`             | `i64`            | Last modification timestamp, Unix seconds         |
+| `last_message`| `u8 flag + fields`| `Option<LastMessagePreview>` | Last message preview; absent for empty chats |
 
 ## ChatKind
 
@@ -146,7 +147,18 @@ Followed by two length-prefixed strings (each absent when `len = 0`):
 └──────────────┴──────────────┴────────────────┴────────────────┘
 ```
 
-Minimum size: 30 bytes (DM, no parent, no strings: 4+1+1+8+8+4+4).
+Followed by last message preview (`u8 flag`: 0 = absent, 1 = preview follows):
+
+```
+┌───────────┬─────────────────────────────────────────────────────────────────┐
+│ flag: u8  │ [id:u32 | sender_id:u32 | created_at:i64 | kind:u8 | flags:u16│
+│           │  | content_preview: String]                                     │
+└───────────┴─────────────────────────────────────────────────────────────────┘
+```
+
+`content_preview` is a server-truncated plain-text snippet (up to 100 bytes, UTF-8 safe).
+
+Minimum size: 31 bytes (DM, no parent, no strings, no last_message: 4+1+1+8+8+4+4+1).
 
 Timestamps are validated against codec range (see [codec.md](codec.md#timestamp-validation)).
 
@@ -205,18 +217,20 @@ Request: `chat_id: u32`, `cursor: u32` (0 = first page), `limit: u16`
 
 Response: `Ack` with `next_cursor: u32`, `count: u32`, `entries[count]: ChatMemberEntry`.
 
-### UpdateMemberRole (0x48) Request
+### InviteMembers (0x45)
 
-`chat_id: u32`, `user_id: u32`, `role: u8`
+`chat_id: u32`, `count: u16`, `user_ids[count]: u32`
 
 Response: `Ack` (empty).
 
-### InviteMembers (0x45) / KickMember (0x46)
+### UpdateMember (0x46)
 
-- **Invite**: `chat_id: u32`, `count: u16`, `user_ids[count]: u32`
-- **Kick**: `chat_id: u32`, `user_id: u32`
+`chat_id: u32`, `user_id: u32`, `action: u8` + action-specific payload.
 
-Both return `Ack` (empty).
+See [protocol.md](protocol.md#updatemember-0x46) for action discriminant values
+(Kick=0, Ban=1, Mute=2, ChangeRole=3, UpdatePermissions=4, Unban=5).
+
+Response: `Ack` (empty).
 
 ### ChatUpdated (0x28) Event
 

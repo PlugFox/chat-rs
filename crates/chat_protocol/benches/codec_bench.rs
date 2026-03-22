@@ -28,6 +28,7 @@ fn sample_message(id: u32) -> Message {
         updated_at: 1_711_100_000,
         kind: MessageKind::Text,
         flags: MessageFlags::empty(),
+        reply_to_id: None,
         content: "Hello, this is a test message with some content.".into(),
         rich_content: None,
         extra: None,
@@ -43,6 +44,7 @@ fn sample_message_with_rich(id: u32) -> Message {
         updated_at: 1_711_100_000,
         kind: MessageKind::Text,
         flags: MessageFlags::EDITED,
+        reply_to_id: None,
         content: "Hello, this is a rich message with bold and italic and links to places".into(),
         rich_content: Some(vec![
             RichSpan {
@@ -97,6 +99,7 @@ fn bench_frame_header(c: &mut Criterion) {
 fn bench_message_batch_1000(c: &mut Criterion) {
     let batch = MessageBatch {
         messages: (0..1000).map(sample_message).collect(),
+        has_more: false,
     };
 
     // Pre-encode for decode benchmark
@@ -172,6 +175,7 @@ fn bench_rich_content_50_spans(c: &mut Criterion) {
 fn bench_message_with_rich(c: &mut Criterion) {
     let batch = MessageBatch {
         messages: (0..100).map(sample_message_with_rich).collect(),
+        has_more: false,
     };
 
     let mut pre_encoded = BytesMut::new();

@@ -114,6 +114,14 @@ pub fn encode_frame(buf: &mut impl BufMut, frame: &Frame) -> Result<(), CodecErr
             Ok(())
         }
         FramePayload::UserUpdated(e) => encode_user_entry(buf, e),
+        FramePayload::ChatDeleted(p) => {
+            encode_chat_deleted(buf, p);
+            Ok(())
+        }
+        FramePayload::MemberUpdated(p) => {
+            encode_member_updated(buf, p);
+            Ok(())
+        }
 
         FramePayload::Ack(_) => {
             // Ack payloads are context-dependent — encode_frame writes only the
@@ -235,6 +243,8 @@ pub fn decode_frame(buf: &mut impl Buf) -> Result<Frame, CodecError> {
         FrameKind::ChatCreated => FramePayload::ChatCreated(decode_chat_entry(buf)?),
         FrameKind::ReactionUpdate => FramePayload::ReactionUpdate(decode_reaction_update(buf)?),
         FrameKind::UserUpdated => FramePayload::UserUpdated(decode_user_entry(buf)?),
+        FrameKind::ChatDeleted => FramePayload::ChatDeleted(decode_chat_deleted(buf)?),
+        FrameKind::MemberUpdated => FramePayload::MemberUpdated(decode_member_updated(buf)?),
 
         FrameKind::Ack => {
             // Capture remaining bytes — caller decodes based on original request kind.

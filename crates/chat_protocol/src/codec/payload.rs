@@ -100,6 +100,7 @@ pub fn encode_send_message(buf: &mut impl BufMut, p: &SendMessagePayload) {
     write_u32(buf, p.chat_id);
     write_u8(buf, p.kind as u8);
     write_uuid(buf, &p.idempotency_key);
+    write_option_u32(buf, p.reply_to_id);
     write_string(buf, &p.content);
     write_optional_bytes(buf, p.rich_content.as_deref());
     write_optional_string(buf, p.extra.as_deref());
@@ -118,6 +119,7 @@ pub fn decode_send_message(buf: &mut impl Buf) -> Result<SendMessagePayload, Cod
         value: kind_byte as u32,
     })?;
     let idempotency_key = read_uuid(buf)?;
+    let reply_to_id = read_option_u32(buf)?;
     let content = read_string(buf)?;
     let rich_content = read_optional_bytes(buf)?;
     let extra = read_optional_string(buf)?;
@@ -131,6 +133,7 @@ pub fn decode_send_message(buf: &mut impl Buf) -> Result<SendMessagePayload, Cod
         chat_id,
         kind,
         idempotency_key,
+        reply_to_id,
         content,
         rich_content,
         extra,
@@ -146,7 +149,6 @@ pub fn decode_send_message(buf: &mut impl Buf) -> Result<SendMessagePayload, Cod
 pub fn encode_edit_message(buf: &mut impl BufMut, p: &EditMessagePayload) {
     write_u32(buf, p.chat_id);
     write_u32(buf, p.message_id);
-    write_uuid(buf, &p.idempotency_key);
     write_string(buf, &p.content);
     write_optional_bytes(buf, p.rich_content.as_deref());
     write_optional_string(buf, p.extra.as_deref());
@@ -156,7 +158,6 @@ pub fn encode_edit_message(buf: &mut impl BufMut, p: &EditMessagePayload) {
 pub fn decode_edit_message(buf: &mut impl Buf) -> Result<EditMessagePayload, CodecError> {
     let chat_id = read_u32(buf)?;
     let message_id = read_u32(buf)?;
-    let idempotency_key = read_uuid(buf)?;
     let content = read_string(buf)?;
     let rich_content = read_optional_bytes(buf)?;
     let extra = read_optional_string(buf)?;
@@ -164,7 +165,6 @@ pub fn decode_edit_message(buf: &mut impl Buf) -> Result<EditMessagePayload, Cod
     Ok(EditMessagePayload {
         chat_id,
         message_id,
-        idempotency_key,
         content,
         rich_content,
         extra,
@@ -179,19 +179,13 @@ pub fn decode_edit_message(buf: &mut impl Buf) -> Result<EditMessagePayload, Cod
 pub fn encode_delete_message(buf: &mut impl BufMut, p: &DeleteMessagePayload) {
     write_u32(buf, p.chat_id);
     write_u32(buf, p.message_id);
-    write_uuid(buf, &p.idempotency_key);
 }
 
 /// Decode a `DeleteMessagePayload`.
 pub fn decode_delete_message(buf: &mut impl Buf) -> Result<DeleteMessagePayload, CodecError> {
-    let chat_id = read_u32(buf)?;
-    let message_id = read_u32(buf)?;
-    let idempotency_key = read_uuid(buf)?;
-
     Ok(DeleteMessagePayload {
-        chat_id,
-        message_id,
-        idempotency_key,
+        chat_id: read_u32(buf)?,
+        message_id: read_u32(buf)?,
     })
 }
 
@@ -830,6 +824,68 @@ pub fn decode_member_left(buf: &mut impl Buf) -> Result<MemberLeftPayload, Codec
     Ok(MemberLeftPayload {
         chat_id: read_u32(buf)?,
         user_id: read_u32(buf)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// ChatDeleted
+// ---------------------------------------------------------------------------
+
+/// Encode a `ChatDeletedPayload`.
+pub fn encode_chat_deleted(buf: &mut impl BufMut, p: &ChatDeletedPayload) {
+    write_u32(buf, p.chat_id);
+}
+
+/// Decode a `ChatDeletedPayload`.
+pub fn decode_chat_deleted(buf: &mut impl Buf) -> Result<ChatDeletedPayload, CodecError> {
+    Ok(ChatDeletedPayload {
+        chat_id: read_u32(buf)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// MemberUpdated
+// ---------------------------------------------------------------------------
+
+/// Encode a `MemberUpdatedPayload`.
+pub fn encode_member_updated(buf: &mut impl BufMut, p: &MemberUpdatedPayload) {
+    write_u32(buf, p.chat_id);
+    write_u32(buf, p.user_id);
+    write_u8(buf, p.role as u8);
+    match p.permissions {
+        Some(perms) => {
+            write_u8(buf, 1);
+            write_u32(buf, perms.bits());
+        }
+        None => write_u8(buf, 0),
+    }
+}
+
+/// Decode a `MemberUpdatedPayload`.
+pub fn decode_member_updated(buf: &mut impl Buf) -> Result<MemberUpdatedPayload, CodecError> {
+    let chat_id = read_u32(buf)?;
+    let user_id = read_u32(buf)?;
+    let role_byte = read_u8(buf)?;
+    let role = ChatRole::from_u8(role_byte).ok_or(CodecError::UnknownDiscriminant {
+        type_name: "ChatRole",
+        value: role_byte as u32,
+    })?;
+    let perm_flag = read_u8(buf)?;
+    let permissions = match perm_flag {
+        0 => None,
+        1 => Some(Permission::from_bits_truncate(read_u32(buf)?)),
+        _ => {
+            return Err(CodecError::UnknownDiscriminant {
+                type_name: "Permission flag",
+                value: perm_flag as u32,
+            });
+        }
+    };
+    Ok(MemberUpdatedPayload {
+        chat_id,
+        user_id,
+        role,
+        permissions,
     })
 }
 

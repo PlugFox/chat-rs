@@ -28,7 +28,7 @@ mod unit {
     #[test]
     fn frame_kind_from_u8_unknown() {
         // 0x00, 0x05, 0xFF should all return None
-        for byte in [0x00, 0x06, 0x0F, 0x2C, 0x32, 0x4C, 0x56, 0xFF] {
+        for byte in [0x00, 0x06, 0x0F, 0x2E, 0x32, 0x4C, 0x56, 0xFF] {
             assert!(FrameKind::from_u8(byte).is_none(), "expected None for 0x{byte:02x}");
         }
     }
@@ -36,7 +36,7 @@ mod unit {
     #[test]
     fn frame_kind_all_count() {
         // Ensure all() returns the expected number of variants
-        assert_eq!(FrameKind::all().len(), 51);
+        assert_eq!(FrameKind::all().len(), 53);
     }
 
     // -- ErrorCode --
@@ -331,6 +331,7 @@ mod unit {
             chat_id: 1,
             kind: MessageKind::Text,
             idempotency_key: uuid::Uuid::new_v4(),
+            reply_to_id: Some(10),
             content: "Hello, world!".into(),
             rich_content: None,
             extra: Some(r#"{"key":"value"}"#.into()),
@@ -348,7 +349,6 @@ mod unit {
         let payload = EditMessagePayload {
             chat_id: 1,
             message_id: 5,
-            idempotency_key: uuid::Uuid::new_v4(),
             content: "edited content".into(),
             rich_content: None,
             extra: None,
@@ -365,7 +365,6 @@ mod unit {
         let payload = DeleteMessagePayload {
             chat_id: 1,
             message_id: 5,
-            idempotency_key: uuid::Uuid::new_v4(),
         };
         let mut buf = BytesMut::new();
         encode_delete_message(&mut buf, &payload);
@@ -566,6 +565,7 @@ mod unit {
             updated_at: 1_711_100_000,
             kind: MessageKind::Text,
             flags: MessageFlags::empty(),
+            reply_to_id: None,
             content: format!("Message {id}"),
             rich_content: None,
             extra: None,
@@ -592,6 +592,7 @@ mod unit {
             updated_at: 1_711_100_100,
             kind: MessageKind::Text,
             flags: MessageFlags::EDITED | MessageFlags::REPLY,
+            reply_to_id: Some(5),
             content: "Hello bold world".into(),
             rich_content: Some(vec![
                 RichSpan {
@@ -620,6 +621,7 @@ mod unit {
     fn message_batch_roundtrip() {
         let batch = MessageBatch {
             messages: (1..=10).map(sample_message).collect(),
+            has_more: true,
         };
         let mut buf = BytesMut::new();
         encode_message_batch(&mut buf, &batch).unwrap();
@@ -630,7 +632,10 @@ mod unit {
 
     #[test]
     fn message_batch_empty() {
-        let batch = MessageBatch { messages: vec![] };
+        let batch = MessageBatch {
+            messages: vec![],
+            has_more: false,
+        };
         let mut buf = BytesMut::new();
         encode_message_batch(&mut buf, &batch).unwrap();
 
@@ -788,6 +793,7 @@ mod unit {
             updated_at: 1_711_100_000,
             kind: MessageKind::Text,
             flags: MessageFlags::empty(),
+            reply_to_id: None,
             content: String::new(),
             rich_content: None,
             extra: None,
@@ -1052,6 +1058,7 @@ mod unit {
             chat_id: 1,
             kind: MessageKind::Image,
             idempotency_key: uuid::Uuid::new_v4(),
+            reply_to_id: None,
             content: "photo.jpg".into(),
             rich_content: None,
             extra: Some(r#"{"url":"https://cdn.example.com/photo.jpg"}"#.into()),
@@ -1154,6 +1161,7 @@ mod unit {
                 chat_id: 1,
                 kind: MessageKind::Text,
                 idempotency_key: uuid::Uuid::new_v4(),
+                reply_to_id: None,
                 content: "hello".into(),
                 rich_content: None,
                 extra: None,
@@ -1446,6 +1454,7 @@ mod unit {
             chat_id: 1,
             kind: MessageKind::Text,
             idempotency_key: uuid::Uuid::new_v4(),
+            reply_to_id: None,
             content: "Hey @alice @bob".into(),
             rich_content: None,
             extra: None,
@@ -1482,6 +1491,129 @@ mod unit {
         let decoded = decode_frame(&mut buf).unwrap();
         assert_eq!(decoded.event_seq, 12345);
         assert_eq!(decoded, frame);
+    }
+
+    // -- ChatDeleted & MemberUpdated --
+
+    #[test]
+    fn chat_deleted_roundtrip() {
+        let payload = ChatDeletedPayload { chat_id: 42 };
+        let mut buf = BytesMut::new();
+        encode_chat_deleted(&mut buf, &payload);
+        assert_eq!(decode_chat_deleted(&mut buf).unwrap(), payload);
+    }
+
+    #[test]
+    fn member_updated_roundtrip() {
+        let payload = MemberUpdatedPayload {
+            chat_id: 1,
+            user_id: 42,
+            role: ChatRole::Moderator,
+            permissions: Some(Permission::SEND_MESSAGES | Permission::MUTE_MEMBERS),
+        };
+        let mut buf = BytesMut::new();
+        encode_member_updated(&mut buf, &payload);
+        assert_eq!(decode_member_updated(&mut buf).unwrap(), payload);
+    }
+
+    #[test]
+    fn member_updated_no_override_roundtrip() {
+        let payload = MemberUpdatedPayload {
+            chat_id: 1,
+            user_id: 42,
+            role: ChatRole::Admin,
+            permissions: None,
+        };
+        let mut buf = BytesMut::new();
+        encode_member_updated(&mut buf, &payload);
+        assert_eq!(decode_member_updated(&mut buf).unwrap(), payload);
+    }
+
+    #[test]
+    fn frame_chat_deleted_roundtrip() {
+        let frame = Frame {
+            seq: 0,
+            event_seq: 100,
+            payload: FramePayload::ChatDeleted(ChatDeletedPayload { chat_id: 5 }),
+        };
+        let mut buf = BytesMut::new();
+        encode_frame(&mut buf, &frame).unwrap();
+        let decoded = decode_frame(&mut buf).unwrap();
+        assert_eq!(decoded, frame);
+    }
+
+    #[test]
+    fn frame_member_updated_roundtrip() {
+        let frame = Frame {
+            seq: 0,
+            event_seq: 200,
+            payload: FramePayload::MemberUpdated(MemberUpdatedPayload {
+                chat_id: 1,
+                user_id: 42,
+                role: ChatRole::Moderator,
+                permissions: None,
+            }),
+        };
+        let mut buf = BytesMut::new();
+        encode_frame(&mut buf, &frame).unwrap();
+        let decoded = decode_frame(&mut buf).unwrap();
+        assert_eq!(decoded, frame);
+    }
+
+    // -- reply_to_id --
+
+    #[test]
+    fn send_message_reply_roundtrip() {
+        let payload = SendMessagePayload {
+            chat_id: 1,
+            kind: MessageKind::Text,
+            idempotency_key: uuid::Uuid::new_v4(),
+            reply_to_id: Some(42),
+            content: "replying".into(),
+            rich_content: None,
+            extra: None,
+            mentioned_user_ids: vec![7],
+        };
+        let mut buf = BytesMut::new();
+        encode_send_message(&mut buf, &payload);
+        let decoded = decode_send_message(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn message_with_reply_roundtrip() {
+        let msg = Message {
+            id: 10,
+            chat_id: 1,
+            sender_id: 42,
+            created_at: 1_711_100_000,
+            updated_at: 1_711_100_000,
+            kind: MessageKind::Text,
+            flags: MessageFlags::REPLY,
+            reply_to_id: Some(5),
+            content: "replying to msg 5".into(),
+            rich_content: None,
+            extra: None,
+        };
+        let mut buf = BytesMut::new();
+        encode_message(&mut buf, &msg).unwrap();
+        let decoded = decode_message(&mut buf).unwrap();
+        assert_eq!(decoded, msg);
+    }
+
+    // -- has_more --
+
+    #[test]
+    fn message_batch_has_more() {
+        let batch = MessageBatch {
+            messages: vec![sample_message(1)],
+            has_more: true,
+        };
+        let mut buf = BytesMut::new();
+        encode_message_batch(&mut buf, &batch).unwrap();
+        let decoded = decode_message_batch(&mut buf).unwrap();
+        assert!(decoded.has_more);
+        assert_eq!(decoded, batch);
     }
 
     #[test]
@@ -1562,12 +1694,13 @@ mod proptests {
             arb_timestamp(),
             arb_message_kind(),
             arb_message_flags(),
+            prop::option::of(any::<u32>()),
             arb_short_string(),
             prop::option::of(prop::collection::vec(arb_rich_span(200), 0..10)),
             prop::option::of(arb_short_string()),
         )
             .prop_map(
-                |(id, chat_id, sender_id, created_at, updated_at, kind, flags, content, rich, extra)| {
+                |(id, chat_id, sender_id, created_at, updated_at, kind, flags, reply_to_id, content, rich, extra)| {
                     Message {
                         id,
                         chat_id,
@@ -1576,6 +1709,7 @@ mod proptests {
                         updated_at,
                         kind,
                         flags,
+                        reply_to_id,
                         content,
                         rich_content: rich,
                         // Normalize: Some("") → None (matches wire format behavior)
@@ -1637,7 +1771,7 @@ mod proptests {
         }
 
         #[test]
-        fn message_batch_roundtrip(count in 0usize..100) {
+        fn message_batch_roundtrip(count in 0usize..100, has_more in any::<bool>()) {
             let batch = MessageBatch {
                 messages: (0..count as u32).map(|i| Message {
                     id: i,
@@ -1647,10 +1781,12 @@ mod proptests {
                     updated_at: 1_711_100_000,
                     kind: MessageKind::Text,
                     flags: MessageFlags::empty(),
+                    reply_to_id: None,
                     content: format!("msg {i}"),
                     rich_content: None,
                     extra: None,
                 }).collect(),
+                has_more,
             };
             let mut buf = BytesMut::new();
             encode_message_batch(&mut buf, &batch).unwrap();
@@ -1742,6 +1878,7 @@ mod proptests {
         fn send_message_roundtrip(
             chat_id in any::<u32>(),
             kind_idx in 0u8..3,
+            reply_to_id in prop::option::of(any::<u32>()),
             content in arb_short_string(),
             extra in prop::option::of(arb_short_string()),
         ) {
@@ -1750,6 +1887,7 @@ mod proptests {
                 chat_id,
                 kind,
                 idempotency_key: uuid::Uuid::new_v4(),
+                reply_to_id,
                 content,
                 rich_content: None,
                 extra: extra.filter(|s| !s.is_empty()),

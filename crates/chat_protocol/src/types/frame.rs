@@ -80,6 +80,10 @@ pub enum FrameKind {
     ReactionUpdate = 0x2A,
     /// User profile changed (server → client push).
     UserUpdated = 0x2B,
+    /// Chat was deleted (server → client push).
+    ChatDeleted = 0x2C,
+    /// Chat member's role or permissions changed (server → client push).
+    MemberUpdated = 0x2D,
 
     // Responses (0x30..0x31)
     /// Command acknowledged.
@@ -163,6 +167,8 @@ impl FrameKind {
             0x29 => Some(Self::ChatCreated),
             0x2A => Some(Self::ReactionUpdate),
             0x2B => Some(Self::UserUpdated),
+            0x2C => Some(Self::ChatDeleted),
+            0x2D => Some(Self::MemberUpdated),
 
             0x30 => Some(Self::Ack),
             0x31 => Some(Self::Error),
@@ -225,6 +231,8 @@ impl FrameKind {
             Self::ChatCreated,
             Self::ReactionUpdate,
             Self::UserUpdated,
+            Self::ChatDeleted,
+            Self::MemberUpdated,
             Self::Ack,
             Self::Error,
             Self::CreateChat,
@@ -355,6 +363,8 @@ pub struct SendMessagePayload {
     pub kind: super::MessageKind,
     /// Client-generated UUID for deduplication. Persisted 24h server-side.
     pub idempotency_key: Uuid,
+    /// Message this is replying to. `None` = not a reply.
+    pub reply_to_id: Option<u32>,
     /// Plain-text message content.
     pub content: String,
     /// Rich content spans (encoded as blob). `None` = no formatting.
@@ -375,8 +385,6 @@ pub struct EditMessagePayload {
     pub chat_id: u32,
     /// Message to edit.
     pub message_id: u32,
-    /// Client-generated UUID for deduplication.
-    pub idempotency_key: Uuid,
     /// New plain-text content.
     pub content: String,
     /// New rich content spans. `None` = remove formatting.
@@ -386,14 +394,12 @@ pub struct EditMessagePayload {
 }
 
 /// DeleteMessage frame payload (client → server).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeleteMessagePayload {
     /// Target chat.
     pub chat_id: u32,
     /// Message to delete.
     pub message_id: u32,
-    /// Client-generated UUID for deduplication.
-    pub idempotency_key: Uuid,
 }
 
 /// ReadReceipt frame payload (client → server, fire-and-forget).
@@ -711,6 +717,30 @@ pub struct MemberLeftPayload {
     pub user_id: u32,
 }
 
+/// ChatDeleted event payload (server → client).
+///
+/// Pushed when a chat is deleted. Clients should remove it from the chat list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChatDeletedPayload {
+    /// Deleted chat ID.
+    pub chat_id: u32,
+}
+
+/// MemberUpdated event payload (server → client).
+///
+/// Pushed when a member's role or permissions change in a chat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MemberUpdatedPayload {
+    /// Target chat.
+    pub chat_id: u32,
+    /// User whose membership changed.
+    pub user_id: u32,
+    /// New role.
+    pub role: super::ChatRole,
+    /// New permission override. `None` = use role defaults.
+    pub permissions: Option<super::Permission>,
+}
+
 // --- Reaction payloads ---
 
 /// AddReaction frame payload (client → server).
@@ -981,6 +1011,8 @@ pub enum FramePayload {
     ChatCreated(super::ChatEntry),
     ReactionUpdate(ReactionUpdatePayload),
     UserUpdated(super::UserEntry),
+    ChatDeleted(ChatDeletedPayload),
+    MemberUpdated(MemberUpdatedPayload),
 
     // Responses
     Ack(AckPayload),
@@ -1044,6 +1076,8 @@ impl FramePayload {
             Self::ChatCreated(_) => FrameKind::ChatCreated,
             Self::ReactionUpdate(_) => FrameKind::ReactionUpdate,
             Self::UserUpdated(_) => FrameKind::UserUpdated,
+            Self::ChatDeleted(_) => FrameKind::ChatDeleted,
+            Self::MemberUpdated(_) => FrameKind::MemberUpdated,
             Self::Ack(_) => FrameKind::Ack,
             Self::Error(_) => FrameKind::Error,
             Self::CreateChat(_) => FrameKind::CreateChat,

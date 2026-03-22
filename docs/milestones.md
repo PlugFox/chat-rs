@@ -26,56 +26,7 @@ M8  Scaling          ████████████████  Redis clu
 
 `chat_protocol` — единственный crate, zero external runtime deps (только serde, bytes, thiserror, bitflags, uuid).
 
-### Deliverables
-
-#### Codec
-- [ ] `encode_header()` / `decode_header()` — frame header
-- [ ] Encode/decode для каждого frame payload (SendMessage, Ack, Error, Welcome, Hello, etc.)
-- [ ] Message batch encode/decode (count + N messages)
-- [ ] Rich content BLOB encode/decode (spans with offsets)
-- [ ] String/bytes/Option wire format helpers (u32 len prefix)
-
-#### Frame Payloads (structs)
-- [ ] `HelloPayload` — protocol_version, sdk_version, platform, token, device_id
-- [ ] `WelcomePayload` — session_id, server_time, user_id, missed_messages, limits
-- [ ] `SendMessagePayload` — chat_id, idempotency_key, content, rich_content, extra, reply_to_id
-- [ ] `AckPayload` — message_id (опционально другие поля в зависимости от команды)
-- [ ] `ErrorPayload` — code, slug, message, retry_after_ms (опционально)
-- [ ] Payload structs для всех остальных frame kinds
-
-### Tests
-
-- [ ] **Unit**: `FrameKind::from_u8()` roundtrip для всех вариантов
-- [ ] **Unit**: `ErrorCode` slug stability, permanent/transient classification
-- [ ] **Unit**: `Permission` bitflags операции, `default_permissions()` для каждой роли × chat kind
-- [ ] **Unit**: `DisconnectCode::should_reconnect()` для каждого range
-- [ ] **Proptest**: codec roundtrip — `encode(x) |> decode == x` для каждого payload type
-- [ ] **Proptest**: message batch roundtrip с произвольным количеством сообщений (0..100)
-- [ ] **Proptest**: rich content roundtrip с overlapping spans
-- [ ] **Proptest**: String/bytes с edge cases (empty, max u32 length prefix, unicode)
-- [ ] **Unit**: error на truncated input (каждый decode path)
-- [ ] **Unit**: error на unknown frame kind
-- [ ] **Unit**: error на frame exceeding max size
-
-### Benchmarks
-
-- [ ] `criterion` bench: encode/decode 1000 messages batch
-- [ ] `criterion` bench: single frame header encode/decode (latency)
-- [ ] `criterion` bench: rich content with 50 spans
-
-### Documentation
-
-- [ ] Rustdoc для каждого public type и function
-- [ ] Module-level docs с wire format diagrams
-- [ ] Обновить `docs/protocol.md` и `docs/codec.md` если API изменился
-
-### Acceptance Criteria
-
-- `cargo test -p chat_protocol` — все тесты зелёные
-- `cargo clippy -p chat_protocol` — zero warnings
-- Proptest с 10000 iterations без failures
-- Benchmarks baseline записаны (для regression tracking в будущих milestone'ах)
-- Каждый public item имеет rustdoc
+- [x] Done
 
 ---
 

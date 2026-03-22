@@ -17,6 +17,7 @@
 | `updated_at` | `i64`             | `i64`                   | Last modification timestamp, Unix seconds (validated)    |
 | `kind`       | `u8`              | `MessageKind`           | Content type                                             |
 | `flags`      | `u16`             | `MessageFlags`          | Bitfield of message properties                           |
+| `reply_to_id`| `u8 flag + u32`   | `Option<u32>`           | Message being replied to; absent = not a reply           |
 | `content`    | `u32 len + UTF-8` | `String`                | Plain text; empty string for deleted tombstones          |
 | `rich`       | `u32 len + blob`  | `Option<Vec<RichSpan>>` | Formatted text spans; absent when `len = 0`              |
 | `extra`      | `u32 len + JSON`  | `Option<String>`        | Optional metadata JSON; absent when `len = 0`            |
@@ -68,8 +69,9 @@ ID sequences remain intact.
 **BOT** — set by the server based on `users.is_bot`. The client never sends this flag;
 the server ignores it if present in a `SendMessage` command.
 
-**REPLY** — this message is a reply to another message. Quoted origin metadata lives
-in the `extra` JSON field (only parse when this flag is set):
+**REPLY** — this message is a reply to another message. The `reply_to_id` field
+contains the ID of the original message. Quoted origin metadata lives in the `extra`
+JSON field (only parse when this flag is set):
 ```json
 { "reply": { "chat_id": 123, "msg_id": 456, "sender_id": 789, "quote": "first 100 chars…" } }
 ```
@@ -88,20 +90,24 @@ All values are little-endian.
 ### MessageBatch
 
 ```
-┌─────────────┬──────────────────────────────────────┐
-│ count: u32  │ messages[count]                       │
-└─────────────┴──────────────────────────────────────┘
+┌───────────────┬─────────────┬──────────────────────────────────────┐
+│ has_more: u8  │ count: u32  │ messages[count]                       │
+└───────────────┴─────────────┴──────────────────────────────────────┘
 ```
 
-### Message — 35-byte fixed header + variable
+`has_more`: 1 = more messages exist beyond this batch, 0 = last page.
+
+### Message — 36-byte min fixed header + variable
 
 ```
- 0    4    8   12      20      28  29     31          35
- ┌────┬────┬───┬───────┬───────┬──┬──────┬───────────┬──────────────────┐
- │ id │chat│snd│crtd_at│upd_at │ki│flags │content_len│ content (UTF-8)  │
- │ u32│ u32│u32│  i64  │  i64  │u8│ u16  │    u32    │    N bytes       │
- └────┴────┴───┴───────┴───────┴──┴──────┴───────────┴──────────────────┘
+ 0    4    8   12      20      28  29     31  32                   36
+ ┌────┬────┬───┬───────┬───────┬──┬──────┬────────────────────────┬───────────┬──────────────────┐
+ │ id │chat│snd│crtd_at│upd_at │ki│flags │reply_to: u8 [+ u32]   │content_len│ content (UTF-8)  │
+ │ u32│ u32│u32│  i64  │  i64  │u8│ u16  │ 1 byte  [+ 4 bytes]   │    u32    │    N bytes       │
+ └────┴────┴───┴───────┴───────┴──┴──────┴────────────────────────┴───────────┴──────────────────┘
 ```
+
+`reply_to` byte: `0` = not a reply (1 byte), `1` = reply_to_id follows as `u32` (5 bytes).
 
 Followed by variable-length tail (each section absent when its `len = 0`):
 

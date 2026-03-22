@@ -246,12 +246,25 @@ Payload is a full `ChatEntry` — clients replace their cached copy.
 Server pushes this when the user is added to a new chat (invited, or DM initiated by
 someone else). Payload is a full `ChatEntry`.
 
+### ChatDeleted (0x2C) Event
+
+Server pushes this when a chat is deleted. Payload: `chat_id: u32`.
+Clients should remove the chat from the chat list and close any open views.
+
+### MemberUpdated (0x2D) Event
+
+Server pushes this when a member's role or permissions change (via `UpdateMember`).
+Payload uses the same wire format as `ChatMemberEntry`:
+`chat_id: u32`, `user_id: u32`, `role: u8`, `perm_flag: u8` [+ `permissions: u32`].
+
+`perm_flag = 0` means use role defaults, `perm_flag = 1` means explicit override follows.
+
 ## Subscription Model
 
 Receiving real-time events for a chat requires an explicit `Subscribe (0x18)` call
 with `chat_id: u32`. The server then pushes:
 `MessageNew`, `MessageEdited`, `MessageDeleted`, `ReceiptUpdate`, `TypingUpdate`,
-`MemberJoined`, `MemberLeft`.
+`MemberJoined`, `MemberLeft`, `MemberUpdated`, `ChatDeleted`.
 
 `Subscribe` does **not** push historical messages — the client loads history separately
 via `LoadMessages`. This keeps the subscription lightweight and avoids redundant data

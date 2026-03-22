@@ -7,8 +7,9 @@ use crate::types::{Message, MessageBatch, MessageFlags, MessageKind, RichSpan, R
 
 use super::wire::*;
 
-/// Encode a `MessageBatch` (count: u32 + messages).
+/// Encode a `MessageBatch` (has_more: u8, count: u32 + messages).
 pub fn encode_message_batch(buf: &mut impl BufMut, batch: &MessageBatch) -> Result<(), CodecError> {
+    write_u8(buf, batch.has_more as u8);
     write_u32(buf, batch.messages.len() as u32);
     for msg in &batch.messages {
         encode_message(buf, msg)?;
@@ -18,12 +19,13 @@ pub fn encode_message_batch(buf: &mut impl BufMut, batch: &MessageBatch) -> Resu
 
 /// Decode a `MessageBatch` from the buffer.
 pub fn decode_message_batch(buf: &mut impl Buf) -> Result<MessageBatch, CodecError> {
+    let has_more = read_u8(buf)? != 0;
     let count = read_u32(buf)? as usize;
     let mut messages = Vec::with_capacity(count.min(1024));
     for _ in 0..count {
         messages.push(decode_message(buf)?);
     }
-    Ok(MessageBatch { messages })
+    Ok(MessageBatch { messages, has_more })
 }
 
 /// Encode a single `Message` (35-byte fixed header + variable).
@@ -36,6 +38,7 @@ pub fn encode_message(buf: &mut impl BufMut, msg: &Message) -> Result<(), CodecE
     write_timestamp(buf, msg.updated_at)?;
     write_u8(buf, msg.kind as u8);
     write_u16(buf, msg.flags.bits());
+    write_option_u32(buf, msg.reply_to_id);
 
     // Content (length-prefixed string)
     write_string(buf, &msg.content);
@@ -74,6 +77,7 @@ pub fn decode_message(buf: &mut impl Buf) -> Result<Message, CodecError> {
     // from_bits_truncate: intentionally drops unknown flag bits for forward compatibility.
     // A newer server may set flags the client doesn't know about yet.
     let flags = MessageFlags::from_bits_truncate(read_u16(buf)?);
+    let reply_to_id = read_option_u32(buf)?;
 
     // Content
     let content = read_string(buf)?;
@@ -99,6 +103,7 @@ pub fn decode_message(buf: &mut impl Buf) -> Result<Message, CodecError> {
         updated_at,
         kind,
         flags,
+        reply_to_id,
         content,
         rich_content,
         extra,

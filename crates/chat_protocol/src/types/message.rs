@@ -137,6 +137,9 @@ pub struct Message {
     pub kind: MessageKind,
     /// Bitfield of message properties.
     pub flags: MessageFlags,
+    /// Message this is replying to. `None` = not a reply.
+    /// When set, `MessageFlags::REPLY` is also set.
+    pub reply_to_id: Option<u32>,
     /// Plain text content; empty string for deleted tombstones.
     pub content: String,
     /// Rich content spans. `None` = no formatting.
@@ -150,4 +153,6 @@ pub struct Message {
 pub struct MessageBatch {
     /// Messages in this batch.
     pub messages: Vec<Message>,
+    /// Whether more messages exist beyond this batch.
+    pub has_more: bool,
 }

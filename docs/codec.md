@@ -78,16 +78,22 @@ Used as response to `LoadMessages (0x1A)` and as payload of `MessageNew (0x20)` 
 
 ```
 MessageBatch:
-┌──────────────┬──────────────────────────────────────┐
-│ count: u32   │ messages[count]                      │
-└──────────────┴──────────────────────────────────────┘
-
-Message (fixed header 35 bytes + variable):
-┌─────────┬──────────┬───────────┬─────────┬──────────┬────────┬──────────┬─────────────┬──────────────────┐
-│ id: u32 │ chat: u32│sender: u32│crtd_at:i64│upd_at:i64│kind: u8│flags: u16│ content_len │ content (UTF-8)  │
-│  4 bytes│  4 bytes │  4 bytes  │  8 bytes│  8 bytes │  1 byte│  2 bytes │   u32 4bytes│  N bytes         │
-└─────────┴──────────┴───────────┴─────────┴──────────┴────────┴──────────┴─────────────┴──────────────────┘
+┌───────────────┬──────────────┬──────────────────────────────────────┐
+│ has_more: u8  │ count: u32   │ messages[count]                      │
+└───────────────┴──────────────┴──────────────────────────────────────┘
 ```
+
+`has_more`: 1 = more messages exist beyond this batch, 0 = this is the last page.
+
+```
+Message (fixed header 40 bytes + variable):
+┌─────────┬──────────┬───────────┬─────────┬──────────┬────────┬──────────┬──────────────────────────────┬─────────────┬──────────────────┐
+│ id: u32 │ chat: u32│sender: u32│crtd_at:i64│upd_at:i64│kind: u8│flags: u16│ reply_to: u8 [+ u32]         │ content_len │ content (UTF-8)  │
+│  4 bytes│  4 bytes │  4 bytes  │  8 bytes│  8 bytes │  1 byte│  2 bytes │ 1 byte   [+ 4 bytes]         │   u32 4bytes│  N bytes         │
+└─────────┴──────────┴───────────┴─────────┴──────────┴────────┴──────────┴──────────────────────────────┴─────────────┴──────────────────┘
+```
+
+`reply_to` byte: `0` = not a reply, `1` = reply_to_id follows as `u32`.
 
 Followed by: `rich_len: u32` + rich blob, `extra_len: u32` + extra JSON bytes. If len = 0, no data and no allocation.
 

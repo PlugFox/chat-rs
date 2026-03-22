@@ -3,9 +3,7 @@
 
 /// GetChatInfo frame payload (client → server).
 class GetChatInfoPayload {
-  const GetChatInfoPayload({
-    required this.chatId,
-  });
+  const GetChatInfoPayload({required this.chatId});
 
   /// Target chat.
   final int chatId;
@@ -13,8 +11,7 @@ class GetChatInfoPayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is GetChatInfoPayload &&
-          chatId == other.chatId;
+      other is GetChatInfoPayload && chatId == other.chatId;
 
   @override
   int get hashCode => chatId.hashCode;

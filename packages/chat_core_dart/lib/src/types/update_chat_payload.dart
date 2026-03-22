@@ -8,16 +8,14 @@
 /// distinguishable from `None`, so we use a `u8 flag` prefix:
 /// `0` = don't change, `1` = set to following string (empty string = clear).
 class UpdateChatPayload {
-  const UpdateChatPayload({
-    required this.chatId,
-    this.title,
-    this.avatarUrl,
-  });
+  const UpdateChatPayload({required this.chatId, this.title, this.avatarUrl});
 
   /// Target chat.
   final int chatId;
+
   /// New title. `None` = don't change. `Some("")` = clear.
   final String? title;
+
   /// New avatar URL. `None` = don't change. `Some("")` = clear.
   final String? avatarUrl;
 
@@ -30,12 +28,9 @@ class UpdateChatPayload {
           avatarUrl == other.avatarUrl;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        title,
-        avatarUrl,
-      );
+  int get hashCode => Object.hash(chatId, title, avatarUrl);
 
   @override
-  String toString() => 'UpdateChatPayload(chatId: $chatId, title: $title, avatarUrl: $avatarUrl)';
+  String toString() =>
+      'UpdateChatPayload(chatId: $chatId, title: $title, avatarUrl: $avatarUrl)';
 }

@@ -12,10 +12,13 @@ class RemoveReactionPayload {
 
   /// Target chat.
   final int chatId;
+
   /// Target message.
   final int messageId;
+
   /// Emoji pack ID.
   final int packId;
+
   /// Emoji index within the pack.
   final int emojiIndex;
 
@@ -29,13 +32,9 @@ class RemoveReactionPayload {
           emojiIndex == other.emojiIndex;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        messageId,
-        packId,
-        emojiIndex,
-      );
+  int get hashCode => Object.hash(chatId, messageId, packId, emojiIndex);
 
   @override
-  String toString() => 'RemoveReactionPayload(chatId: $chatId, messageId: $messageId, packId: $packId, emojiIndex: $emojiIndex)';
+  String toString() =>
+      'RemoveReactionPayload(chatId: $chatId, messageId: $messageId, packId: $packId, emojiIndex: $emojiIndex)';
 }

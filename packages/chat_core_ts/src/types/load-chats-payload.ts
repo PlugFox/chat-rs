@@ -9,5 +9,9 @@
  * - Mode 1: subsequent page (cursor from previous response)
  */
 export type LoadChatsPayload =
-  | { readonly type: 'firstPage'; readonly limit: number }
-  | { readonly type: 'after'; readonly cursorTs: number; readonly limit: number };
+  | { readonly type: "firstPage"; readonly limit: number }
+  | {
+      readonly type: "after";
+      readonly cursorTs: number;
+      readonly limit: number;
+    };

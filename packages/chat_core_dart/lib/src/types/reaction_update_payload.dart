@@ -14,14 +14,19 @@ class ReactionUpdatePayload {
 
   /// Chat containing the message.
   final int chatId;
+
   /// Message that was reacted to.
   final int messageId;
+
   /// User who added or removed the reaction.
   final int userId;
+
   /// Emoji pack ID.
   final int packId;
+
   /// Emoji index within the pack.
   final int emojiIndex;
+
   /// `true` = reaction added, `false` = reaction removed.
   final bool added;
 
@@ -37,15 +42,10 @@ class ReactionUpdatePayload {
           added == other.added;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        messageId,
-        userId,
-        packId,
-        emojiIndex,
-        added,
-      );
+  int get hashCode =>
+      Object.hash(chatId, messageId, userId, packId, emojiIndex, added);
 
   @override
-  String toString() => 'ReactionUpdatePayload(chatId: $chatId, messageId: $messageId, userId: $userId, packId: $packId, emojiIndex: $emojiIndex, added: $added)';
+  String toString() =>
+      'ReactionUpdatePayload(chatId: $chatId, messageId: $messageId, userId: $userId, packId: $packId, emojiIndex: $emojiIndex, added: $added)';
 }

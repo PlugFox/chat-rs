@@ -15,10 +15,13 @@ class ForwardMessagePayload {
 
   /// Source chat containing the message to forward.
   final int fromChatId;
+
   /// Message to forward.
   final int messageId;
+
   /// Target chat to forward into.
   final int toChatId;
+
   /// Client-generated UUID for deduplication.
   final String idempotencyKey;
 
@@ -32,13 +35,10 @@ class ForwardMessagePayload {
           idempotencyKey == other.idempotencyKey;
 
   @override
-  int get hashCode => Object.hash(
-        fromChatId,
-        messageId,
-        toChatId,
-        idempotencyKey,
-      );
+  int get hashCode =>
+      Object.hash(fromChatId, messageId, toChatId, idempotencyKey);
 
   @override
-  String toString() => 'ForwardMessagePayload(fromChatId: $fromChatId, messageId: $messageId, toChatId: $toChatId, idempotencyKey: $idempotencyKey)';
+  String toString() =>
+      'ForwardMessagePayload(fromChatId: $fromChatId, messageId: $messageId, toChatId: $toChatId, idempotencyKey: $idempotencyKey)';
 }

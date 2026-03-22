@@ -16,12 +16,16 @@ class WelcomePayload {
 
   /// Transient session identifier for this connection.
   final int sessionId;
+
   /// Server clock, Unix seconds. Client uses for clock-sync.
   final int serverTime;
+
   /// Authenticated user's internal ID.
   final int userId;
+
   /// Server-enforced limits.
   final ServerLimits limits;
+
   /// Server-advertised feature capabilities.
   final ServerCapabilities capabilities;
 
@@ -36,14 +40,10 @@ class WelcomePayload {
           capabilities == other.capabilities;
 
   @override
-  int get hashCode => Object.hash(
-        sessionId,
-        serverTime,
-        userId,
-        limits,
-        capabilities,
-      );
+  int get hashCode =>
+      Object.hash(sessionId, serverTime, userId, limits, capabilities);
 
   @override
-  String toString() => 'WelcomePayload(sessionId: $sessionId, serverTime: $serverTime, userId: $userId, limits: $limits, capabilities: $capabilities)';
+  String toString() =>
+      'WelcomePayload(sessionId: $sessionId, serverTime: $serverTime, userId: $userId, limits: $limits, capabilities: $capabilities)';
 }

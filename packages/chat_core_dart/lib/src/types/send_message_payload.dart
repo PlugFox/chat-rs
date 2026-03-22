@@ -21,18 +21,25 @@ class SendMessagePayload {
 
   /// Target chat.
   final int chatId;
+
   /// Content type. Defaults to `Text` if omitted by the client.
   final MessageKind kind;
+
   /// Client-generated UUID for deduplication. Persisted 24h server-side.
   final String idempotencyKey;
+
   /// Message this is replying to. `None` = not a reply.
   final int? replyToId;
+
   /// Plain-text message content.
   final String content;
+
   /// Rich content spans (encoded as blob). `None` = no formatting.
   final Uint8List? richContent;
+
   /// Extra metadata JSON. `None` = no metadata.
   final String? extra;
+
   /// User IDs explicitly mentioned in this message.
   ///
   /// Server uses this for push notification routing (avoids parsing rich content).
@@ -54,16 +61,17 @@ class SendMessagePayload {
 
   @override
   int get hashCode => Object.hash(
-        chatId,
-        kind,
-        idempotencyKey,
-        replyToId,
-        content,
-        Object.hashAll(richContent ?? const []),
-        extra,
-        Object.hashAll(mentionedUserIds),
-      );
+    chatId,
+    kind,
+    idempotencyKey,
+    replyToId,
+    content,
+    Object.hashAll(richContent ?? const []),
+    extra,
+    Object.hashAll(mentionedUserIds),
+  );
 
   @override
-  String toString() => 'SendMessagePayload(chatId: $chatId, kind: $kind, idempotencyKey: $idempotencyKey, replyToId: $replyToId, content: $content, richContent: $richContent, extra: $extra, mentionedUserIds: $mentionedUserIds)';
+  String toString() =>
+      'SendMessagePayload(chatId: $chatId, kind: $kind, idempotencyKey: $idempotencyKey, replyToId: $replyToId, content: $content, richContent: $richContent, extra: $extra, mentionedUserIds: $mentionedUserIds)';
 }

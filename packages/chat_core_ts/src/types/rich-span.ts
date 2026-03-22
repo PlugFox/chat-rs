@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { RichStyle } from './rich-style.js';
+import type { RichStyle } from "./rich-style.js";
 
 /**
  * A rich text span — a styled range within the plain-text content.

@@ -3,9 +3,7 @@
 
 /// LeaveChat frame payload (client → server).
 class LeaveChatPayload {
-  const LeaveChatPayload({
-    required this.chatId,
-  });
+  const LeaveChatPayload({required this.chatId});
 
   /// Target chat.
   final int chatId;
@@ -13,8 +11,7 @@ class LeaveChatPayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is LeaveChatPayload &&
-          chatId == other.chatId;
+      other is LeaveChatPayload && chatId == other.chatId;
 
   @override
   int get hashCode => chatId.hashCode;

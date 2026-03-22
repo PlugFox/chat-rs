@@ -12,23 +12,43 @@ sealed class LoadChatsPayload {
 
 /// First page — no cursor needed.
 class LoadChatsFirstPage extends LoadChatsPayload {
-  const LoadChatsFirstPage({
-    required this.limit,
-  });
+  const LoadChatsFirstPage({required this.limit});
 
   /// Max entries to return.
   final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LoadChatsFirstPage && limit == other.limit;
+
+  @override
+  int get hashCode => limit.hashCode;
+
+  @override
+  String toString() => 'LoadChatsFirstPage(limit: $limit)';
 }
 
 /// Subsequent page — uses `next_cursor_ts` from previous response.
 class LoadChatsAfter extends LoadChatsPayload {
-  const LoadChatsAfter({
-    required this.cursorTs,
-    required this.limit,
-  });
+  const LoadChatsAfter({required this.cursorTs, required this.limit});
 
   /// Cursor timestamp from previous response's `next_cursor_ts`.
   final int cursorTs;
+
   /// Max entries to return.
   final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LoadChatsAfter &&
+          cursorTs == other.cursorTs &&
+          limit == other.limit;
+
+  @override
+  int get hashCode => Object.hash(cursorTs, limit);
+
+  @override
+  String toString() => 'LoadChatsAfter(cursorTs: $cursorTs, limit: $limit)';
 }

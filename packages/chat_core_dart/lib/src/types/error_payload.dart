@@ -14,10 +14,13 @@ class ErrorPayload {
 
   /// Numeric error code.
   final ErrorCode code;
+
   /// Developer-facing error description (not for end users).
   final String message;
+
   /// Retry delay in milliseconds (only set for `rate_limited`, 0 otherwise).
   final int retryAfterMs;
+
   /// Server-provided diagnostic JSON details. `None` = absent.
   final String? extra;
 
@@ -31,13 +34,9 @@ class ErrorPayload {
           extra == other.extra;
 
   @override
-  int get hashCode => Object.hash(
-        code,
-        message,
-        retryAfterMs,
-        extra,
-      );
+  int get hashCode => Object.hash(code, message, retryAfterMs, extra);
 
   @override
-  String toString() => 'ErrorPayload(code: $code, message: $message, retryAfterMs: $retryAfterMs, extra: $extra)';
+  String toString() =>
+      'ErrorPayload(code: $code, message: $message, retryAfterMs: $retryAfterMs, extra: $extra)';
 }

@@ -1,8 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { ServerCapabilities } from './server-capabilities.js';
-import type { ServerLimits } from './server-limits.js';
+import type { ServerCapabilities } from "./server-capabilities.js";
+import type { ServerLimits } from "./server-limits.js";
 
 /** Welcome frame payload (server → client). */
 export interface WelcomePayload {

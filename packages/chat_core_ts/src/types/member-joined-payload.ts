@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { ChatRole } from './chat-role.js';
+import type { ChatRole } from "./chat-role.js";
 
 /** MemberJoined event payload (server → client). */
 export interface MemberJoinedPayload {

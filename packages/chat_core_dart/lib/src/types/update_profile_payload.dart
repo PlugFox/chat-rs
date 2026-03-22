@@ -15,10 +15,13 @@ class UpdateProfilePayload {
 
   /// New username. `None` = don't change. `Some("")` = clear.
   final String? username;
+
   /// New first name.
   final String? firstName;
+
   /// New last name.
   final String? lastName;
+
   /// New avatar URL.
   final String? avatarUrl;
 
@@ -32,13 +35,9 @@ class UpdateProfilePayload {
           avatarUrl == other.avatarUrl;
 
   @override
-  int get hashCode => Object.hash(
-        username,
-        firstName,
-        lastName,
-        avatarUrl,
-      );
+  int get hashCode => Object.hash(username, firstName, lastName, avatarUrl);
 
   @override
-  String toString() => 'UpdateProfilePayload(username: $username, firstName: $firstName, lastName: $lastName, avatarUrl: $avatarUrl)';
+  String toString() =>
+      'UpdateProfilePayload(username: $username, firstName: $firstName, lastName: $lastName, avatarUrl: $avatarUrl)';
 }

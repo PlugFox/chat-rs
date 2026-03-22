@@ -21,22 +21,31 @@ class ChatEntry {
 
   /// Globally unique chat ID.
   final int id;
+
   /// Chat type.
   final ChatKind kind;
+
   /// Parent group ID (present only for channels).
   final int? parentId;
+
   /// Creation timestamp, Unix seconds.
   final int createdAt;
+
   /// Last modification timestamp, Unix seconds.
   final int updatedAt;
+
   /// Display title. `None` for DMs.
   final String? title;
+
   /// Avatar URL. `None` when absent.
   final String? avatarUrl;
+
   /// Last message preview. `None` for empty chats.
   final LastMessagePreview? lastMessage;
+
   /// Number of unread messages (server-computed: `last_msg_id - last_read_msg_id`).
   final int unreadCount;
+
   /// Total number of members in this chat.
   final int memberCount;
 
@@ -57,18 +66,19 @@ class ChatEntry {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        kind,
-        parentId,
-        createdAt,
-        updatedAt,
-        title,
-        avatarUrl,
-        lastMessage,
-        unreadCount,
-        memberCount,
-      );
+    id,
+    kind,
+    parentId,
+    createdAt,
+    updatedAt,
+    title,
+    avatarUrl,
+    lastMessage,
+    unreadCount,
+    memberCount,
+  );
 
   @override
-  String toString() => 'ChatEntry(id: $id, kind: $kind, parentId: $parentId, createdAt: $createdAt, updatedAt: $updatedAt, title: $title, avatarUrl: $avatarUrl, lastMessage: $lastMessage, unreadCount: $unreadCount, memberCount: $memberCount)';
+  String toString() =>
+      'ChatEntry(id: $id, kind: $kind, parentId: $parentId, createdAt: $createdAt, updatedAt: $updatedAt, title: $title, avatarUrl: $avatarUrl, lastMessage: $lastMessage, unreadCount: $unreadCount, memberCount: $memberCount)';
 }

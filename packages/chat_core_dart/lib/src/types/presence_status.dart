@@ -5,6 +5,7 @@
 enum PresenceStatus {
   /// User is offline.
   offline(0),
+
   /// User is online (has at least one active WS connection).
   online(1);
 

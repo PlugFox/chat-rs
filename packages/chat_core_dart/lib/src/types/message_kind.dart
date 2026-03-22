@@ -5,10 +5,13 @@
 enum MessageKind {
   /// Plain text message.
   text(0),
+
   /// Image message.
   image(1),
+
   /// File attachment.
   file(2),
+
   /// System event (join/leave/etc). Always paired with `MessageFlags::SYSTEM`.
   system(3);
 

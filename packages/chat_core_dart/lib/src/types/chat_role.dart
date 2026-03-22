@@ -5,10 +5,13 @@
 enum ChatRole {
   /// Regular member.
   member(0),
+
   /// Can moderate (delete others' messages, mute).
   moderator(1),
+
   /// Can manage (invite, kick, change settings, assign roles).
   admin(2),
+
   /// Full control (transfer ownership, delete chat).
   owner(3);
 

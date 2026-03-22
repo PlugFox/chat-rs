@@ -10,7 +10,9 @@ export const enum LoadDirection {
 }
 
 /** Convert wire value to LoadDirection, or undefined if unknown. */
-export function loadDirectionFromValue(value: number): LoadDirection | undefined {
+export function loadDirectionFromValue(
+  value: number,
+): LoadDirection | undefined {
   if (value >= 0 && value <= 1) return value as LoadDirection;
   return undefined;
 }

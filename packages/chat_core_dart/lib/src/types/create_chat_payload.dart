@@ -16,12 +16,16 @@ class CreateChatPayload {
 
   /// Chat type.
   final ChatKind kind;
+
   /// Parent group ID (required for channels).
   final int? parentId;
+
   /// Chat title (absent for DMs).
   final String? title;
+
   /// Chat avatar URL.
   final String? avatarUrl;
+
   /// Initial member user IDs.
   final List<int> memberIds;
 
@@ -36,14 +40,10 @@ class CreateChatPayload {
           listEquals(memberIds, other.memberIds);
 
   @override
-  int get hashCode => Object.hash(
-        kind,
-        parentId,
-        title,
-        avatarUrl,
-        Object.hashAll(memberIds),
-      );
+  int get hashCode =>
+      Object.hash(kind, parentId, title, avatarUrl, Object.hashAll(memberIds));
 
   @override
-  String toString() => 'CreateChatPayload(kind: $kind, parentId: $parentId, title: $title, avatarUrl: $avatarUrl, memberIds: $memberIds)';
+  String toString() =>
+      'CreateChatPayload(kind: $kind, parentId: $parentId, title: $title, avatarUrl: $avatarUrl, memberIds: $memberIds)';
 }

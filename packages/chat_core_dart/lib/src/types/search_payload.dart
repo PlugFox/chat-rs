@@ -14,10 +14,13 @@ class SearchPayload {
 
   /// Search scope.
   final SearchScope scope;
+
   /// Search query string.
   final String query;
+
   /// Pagination cursor (0 = first page).
   final int cursor;
+
   /// Max results to return.
   final int limit;
 
@@ -31,13 +34,9 @@ class SearchPayload {
           limit == other.limit;
 
   @override
-  int get hashCode => Object.hash(
-        scope,
-        query,
-        cursor,
-        limit,
-      );
+  int get hashCode => Object.hash(scope, query, cursor, limit);
 
   @override
-  String toString() => 'SearchPayload(scope: $scope, query: $query, cursor: $cursor, limit: $limit)';
+  String toString() =>
+      'SearchPayload(scope: $scope, query: $query, cursor: $cursor, limit: $limit)';
 }

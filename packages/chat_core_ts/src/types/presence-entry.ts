@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { PresenceStatus } from './presence-status.js';
+import type { PresenceStatus } from "./presence-status.js";
 
 /** A presence entry as transmitted in `PresenceResult` (13 bytes fixed). */
 export interface PresenceEntry {

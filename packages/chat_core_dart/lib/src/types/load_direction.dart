@@ -5,6 +5,7 @@
 enum LoadDirection {
   /// Load older messages (before anchor).
   older(0),
+
   /// Load newer messages (after anchor).
   newer(1);
 

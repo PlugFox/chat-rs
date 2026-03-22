@@ -3,13 +3,11 @@
 
 /// MuteChat frame payload (client → server, RPC).
 class MuteChatPayload {
-  const MuteChatPayload({
-    required this.chatId,
-    required this.durationSecs,
-  });
+  const MuteChatPayload({required this.chatId, required this.durationSecs});
 
   /// Target chat.
   final int chatId;
+
   /// Mute duration in seconds. `0` = mute forever.
   final int durationSecs;
 
@@ -21,11 +19,9 @@ class MuteChatPayload {
           durationSecs == other.durationSecs;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        durationSecs,
-      );
+  int get hashCode => Object.hash(chatId, durationSecs);
 
   @override
-  String toString() => 'MuteChatPayload(chatId: $chatId, durationSecs: $durationSecs)';
+  String toString() =>
+      'MuteChatPayload(chatId: $chatId, durationSecs: $durationSecs)';
 }

@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { MemberAction } from './member-action.js';
+import type { MemberAction } from "./member-action.js";
 
 /**
  * UpdateMember frame payload (client → server).

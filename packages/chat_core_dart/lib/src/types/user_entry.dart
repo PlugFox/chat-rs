@@ -20,18 +20,25 @@ class UserEntry {
 
   /// Internal sequential user ID.
   final int id;
+
   /// User type and capability flags.
   final UserFlags flags;
+
   /// Account creation timestamp, Unix seconds.
   final int createdAt;
+
   /// Last profile modification timestamp, Unix seconds.
   final int updatedAt;
+
   /// Lowercase latin slug (5–32 chars). `None` when not set.
   final String? username;
+
   /// Display first name (1–64 chars). `None` when not set.
   final String? firstName;
+
   /// Display last name (1–64 chars). `None` when not set.
   final String? lastName;
+
   /// Avatar URL. `None` when not set.
   final String? avatarUrl;
 
@@ -50,16 +57,17 @@ class UserEntry {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        flags,
-        createdAt,
-        updatedAt,
-        username,
-        firstName,
-        lastName,
-        avatarUrl,
-      );
+    id,
+    flags,
+    createdAt,
+    updatedAt,
+    username,
+    firstName,
+    lastName,
+    avatarUrl,
+  );
 
   @override
-  String toString() => 'UserEntry(id: $id, flags: $flags, createdAt: $createdAt, updatedAt: $updatedAt, username: $username, firstName: $firstName, lastName: $lastName, avatarUrl: $avatarUrl)';
+  String toString() =>
+      'UserEntry(id: $id, flags: $flags, createdAt: $createdAt, updatedAt: $updatedAt, username: $username, firstName: $firstName, lastName: $lastName, avatarUrl: $avatarUrl)';
 }

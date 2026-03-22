@@ -38,16 +38,23 @@ const TRANSIENT_ERRORS: &[&str] = &[
 pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
     let src_dir = output_dir.join("src");
     let types_dir = src_dir.join("types");
+    let codec_dir = src_dir.join("codec");
+    let tests_dir = output_dir.join("tests");
 
     fs::create_dir_all(&types_dir).context("creating types dir")?;
-    fs::create_dir_all(src_dir.join("codec")).context("creating codec dir")?;
-    fs::create_dir_all(output_dir.join("tests")).context("creating tests dir")?;
+    fs::create_dir_all(&codec_dir).context("creating codec dir")?;
+    fs::create_dir_all(&tests_dir).context("creating tests dir")?;
 
+    // -- Static scaffolding (written only if missing) -------------------------
+    write_if_missing(&output_dir.join("package.json"), &emit_package_json())?;
+    write_if_missing(&output_dir.join("tsconfig.json"), &emit_tsconfig())?;
+    write_if_missing(&output_dir.join("vitest.config.ts"), &emit_vitest_config())?;
+    write_if_missing(&codec_dir.join("error.ts"), &emit_codec_error_ts())?;
+    write_if_missing(&codec_dir.join("reader.ts"), &emit_reader_ts())?;
+    write_if_missing(&codec_dir.join("writer.ts"), &emit_writer_ts())?;
+
+    // -- Generated from IR (always overwritten) -------------------------------
     let mut exports: Vec<String> = Vec::new();
-
-    // package.json + tsconfig.json
-    write_file(&output_dir.join("package.json"), &emit_package_json())?;
-    write_file(&output_dir.join("tsconfig.json"), &emit_tsconfig())?;
 
     // Enums
     for e in &ir.enums {
@@ -83,11 +90,7 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
         exports.push("./constants.ts".into());
     }
 
-    // Codec files (Phase 4)
-    let codec_dir = src_dir.join("codec");
-    write_file(&codec_dir.join("error.ts"), &emit_codec_error_ts())?;
-    write_file(&codec_dir.join("reader.ts"), &emit_reader_ts())?;
-    write_file(&codec_dir.join("writer.ts"), &emit_writer_ts())?;
+    // Codec (IR-dependent)
     write_file(&codec_dir.join("codecs.ts"), &emit_codecs_ts(ir))?;
     write_file(&codec_dir.join("frame.ts"), &emit_frame_codec_ts(ir))?;
 
@@ -101,8 +104,12 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
     exports.sort();
     write_file(&src_dir.join("index.ts"), &emit_barrel(&exports))?;
 
+    // Tests
+    write_file(&tests_dir.join("types.test.ts"), &emit_types_test_ts(ir))?;
+    write_file(&tests_dir.join("codec.test.ts"), &emit_codec_test_ts(ir))?;
+
     eprintln!(
-        "TypeScript: {} enums, {} bitflags, {} structs, {} tagged enums, {} constants + codec",
+        "TypeScript: {} enums, {} bitflags, {} structs, {} tagged enums, {} constants + codec + tests",
         ir.enums.len(),
         ir.bitflags.len(),
         ir.structs.len(),
@@ -115,6 +122,16 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
 
 fn write_file(path: &Path, content: &str) -> Result<()> {
     fs::write(path, content).with_context(|| format!("writing {}", path.display()))
+}
+
+/// Write file only if it does not already exist. Scaffolding files (package.json,
+/// tsconfig, reader, writer, error) are stable — they don't depend on IR and may
+/// be hand-edited (e.g. adding dependencies or optimising hot paths).
+fn write_if_missing(path: &Path, content: &str) -> Result<()> {
+    if !path.exists() {
+        fs::write(path, content).with_context(|| format!("writing {}", path.display()))?;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -285,10 +302,12 @@ fn emit_package_json() -> String {
   },
   "scripts": {
     "build": "tsc",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "~5.7.0"
+    "typescript": "~5.7.0",
+    "vitest": "^3.0.0"
   }
 }
 "#
@@ -1706,4 +1725,516 @@ export class ProtocolWriter {{\n\
   toBytes(): Uint8Array {{ return this.buf.slice(0, this.pos); }}\n\
 }}\n"
     )
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — TypeScript test generation
+// ---------------------------------------------------------------------------
+
+fn emit_vitest_config() -> String {
+    format!(
+        "{HEADER}\nimport {{ defineConfig }} from 'vitest/config';\n\n\
+         export default defineConfig({{\n\
+         \x20 test: {{\n\
+         \x20   include: ['tests/**/*.test.ts'],\n\
+         \x20 }},\n\
+         }});\n"
+    )
+}
+
+/// Generate a TS expression for a test fixture value.
+fn ts_test_value(ty: &FieldType, ir: &ParsedModule) -> String {
+    match ty {
+        FieldType::U8 => "42".into(),
+        FieldType::U16 => "1000".into(),
+        FieldType::U32 => "100000".into(),
+        FieldType::I64 => "1234567890".into(),
+        FieldType::Bool => "true".into(),
+        FieldType::String => "'hello'".into(),
+        FieldType::OptionalString => "'test'".into(),
+        FieldType::UpdatableString => "'updated'".into(),
+        FieldType::Uuid => "'550e8400-e29b-41d4-a716-446655440000'".into(),
+        FieldType::OptionalU32 => "7".into(),
+        FieldType::VecU32 => "[1, 2, 3]".into(),
+        FieldType::VecU8 => "new Uint8Array([1, 2, 3])".into(),
+        FieldType::OptionalBytes => "new Uint8Array([1, 2])".into(),
+        FieldType::VecString => "['a', 'b']".into(),
+        FieldType::Enum(name) => {
+            if let Some(e) = ir.enums.iter().find(|e| e.name == *name) {
+                // const enum: value is just a number, but we reference the enum member
+                format!("{}.{}", name, e.variants[0].name)
+            } else {
+                "0".into()
+            }
+        }
+        FieldType::Bitflags(name) => {
+            if let Some(b) = ir.bitflags.iter().find(|b| b.name == *name) {
+                format!("{}.{}", name, b.flags[0].name)
+            } else {
+                "1".into()
+            }
+        }
+        FieldType::OptionalBitflags(name) => {
+            if let Some(b) = ir.bitflags.iter().find(|b| b.name == *name) {
+                format!("{}.{}", name, b.flags[0].name)
+            } else {
+                "1".into()
+            }
+        }
+        FieldType::Struct(name) => ts_struct_fixture(name, ir),
+        FieldType::OptionalStruct(name) => ts_struct_fixture(name, ir),
+        FieldType::VecStruct(name) => format!("[{}]", ts_struct_fixture(name, ir)),
+        FieldType::OptionalVecStruct(name) => format!("[{}]", ts_struct_fixture(name, ir)),
+        FieldType::TaggedEnum(name) => ts_tagged_enum_fixture(name, ir),
+    }
+}
+
+/// Generate an inline TS struct fixture (object literal).
+fn ts_struct_fixture(name: &str, ir: &ParsedModule) -> String {
+    let s = match ir.structs.iter().find(|s| s.name == name) {
+        Some(s) => s,
+        None => return "{}".into(),
+    };
+
+    let mut parts = Vec::new();
+    for f in &s.fields {
+        let ts_name = to_camel_case(&f.name);
+        let value = ts_test_value(&f.ty, ir);
+        parts.push(format!("{ts_name}: {value}"));
+    }
+    if parts.is_empty() {
+        "{}".into()
+    } else {
+        format!("{{ {} }}", parts.join(", "))
+    }
+}
+
+/// Generate the first variant of a tagged enum as a TS fixture.
+fn ts_tagged_enum_fixture(name: &str, ir: &ParsedModule) -> String {
+    let t = match ir.tagged_enums.iter().find(|t| t.name == name) {
+        Some(t) => t,
+        None => return "{}".into(),
+    };
+
+    let v = &t.variants[0];
+    let type_name = to_lower_camel(&v.name);
+
+    match &v.kind {
+        VariantKind::Unit => format!("{{ type: '{type_name}' as const }}"),
+        VariantKind::Tuple(types) => {
+            let mut parts = vec![format!("type: '{type_name}' as const")];
+            for (i, ty) in types.iter().enumerate() {
+                let name = if types.len() == 1 {
+                    ts_tuple_field_name(ty)
+                } else {
+                    format!("value{}", i + 1)
+                };
+                parts.push(format!("{name}: {}", ts_test_value(ty, ir)));
+            }
+            format!("{{ {} }}", parts.join(", "))
+        }
+        VariantKind::Struct(fields) => {
+            let mut parts = vec![format!("type: '{type_name}' as const")];
+            for f in fields {
+                let ts_name = to_camel_case(&f.name);
+                parts.push(format!("{ts_name}: {}", ts_test_value(&f.ty, ir)));
+            }
+            format!("{{ {} }}", parts.join(", "))
+        }
+    }
+}
+
+/// Field name for a tuple variant (single-element).
+fn ts_tuple_field_name(ty: &FieldType) -> String {
+    match ty {
+        FieldType::Enum(n) | FieldType::Bitflags(n) | FieldType::Struct(n)
+        | FieldType::TaggedEnum(n) => to_lower_camel(n),
+        FieldType::U32 => "value".into(),
+        FieldType::VecU8 => "data".into(),
+        _ => "value".into(),
+    }
+}
+
+/// Generate all variant fixtures for a tagged enum (for codec tests).
+fn ts_tagged_enum_all_variants(name: &str, ir: &ParsedModule) -> Vec<(String, String)> {
+    let t = match ir.tagged_enums.iter().find(|t| t.name == name) {
+        Some(t) => t,
+        None => return vec![],
+    };
+
+    t.variants
+        .iter()
+        .map(|v| {
+            let type_name = to_lower_camel(&v.name);
+            let expr = match &v.kind {
+                VariantKind::Unit => format!("{{ type: '{type_name}' as const }}"),
+                VariantKind::Tuple(types) => {
+                    let mut parts = vec![format!("type: '{type_name}' as const")];
+                    for (i, ty) in types.iter().enumerate() {
+                        let name = if types.len() == 1 {
+                            ts_tuple_field_name(ty)
+                        } else {
+                            format!("value{}", i + 1)
+                        };
+                        parts.push(format!("{name}: {}", ts_test_value(ty, ir)));
+                    }
+                    format!("{{ {} }}", parts.join(", "))
+                }
+                VariantKind::Struct(fields) => {
+                    let mut parts = vec![format!("type: '{type_name}' as const")];
+                    for f in fields {
+                        let ts_name = to_camel_case(&f.name);
+                        parts.push(format!("{ts_name}: {}", ts_test_value(&f.ty, ir)));
+                    }
+                    format!("{{ {} }}", parts.join(", "))
+                }
+            };
+            (v.name.clone(), expr)
+        })
+        .collect()
+}
+
+/// Generate a TS struct fixture with all nullable fields set to null.
+fn ts_struct_fixture_nulls(name: &str, ir: &ParsedModule) -> Option<String> {
+    let s = ir.structs.iter().find(|s| s.name == name)?;
+    if !s.fields.iter().any(|f| is_nullable(&f.ty)) {
+        return None;
+    }
+
+    let mut parts = Vec::new();
+    for f in &s.fields {
+        let ts_name = to_camel_case(&f.name);
+        if is_nullable(&f.ty) {
+            parts.push(format!("{ts_name}: null"));
+        } else {
+            let value = match &f.ty {
+                FieldType::String => "''".into(),
+                FieldType::VecU32 => "[]".into(),
+                FieldType::VecU8 => "new Uint8Array(0)".into(),
+                FieldType::VecString => "[]".into(),
+                FieldType::VecStruct(_) => "[]".into(),
+                _ => ts_test_value(&f.ty, ir),
+            };
+            parts.push(format!("{ts_name}: {value}"));
+        }
+    }
+    Some(format!("{{ {} }}", parts.join(", ")))
+}
+
+fn is_nullable(ty: &FieldType) -> bool {
+    matches!(
+        ty,
+        FieldType::OptionalString
+            | FieldType::UpdatableString
+            | FieldType::OptionalU32
+            | FieldType::OptionalBytes
+            | FieldType::OptionalStruct(_)
+            | FieldType::OptionalBitflags(_)
+            | FieldType::OptionalVecStruct(_)
+    )
+}
+
+// ---------------------------------------------------------------------------
+// 5.3 — TS types test
+// ---------------------------------------------------------------------------
+
+fn emit_types_test_ts(ir: &ParsedModule) -> String {
+    let mut out = String::from(HEADER);
+    out.push_str("\nimport { describe, it, expect } from 'vitest';\nimport {\n");
+
+    // Collect all needed imports
+    let mut imports = BTreeSet::new();
+    for e in &ir.enums {
+        imports.insert(format!("{}", e.name));
+        imports.insert(format!("{}FromValue", to_lower_camel(&e.name)));
+    }
+    for b in &ir.bitflags {
+        imports.insert(b.name.clone());
+    }
+    for i in imports {
+        writeln!(out, "  {i},").unwrap();
+    }
+    out.push_str("} from '../src/index.js';\n\n");
+
+    // Enum tests
+    for e in &ir.enums {
+        let fn_name = format!("{}FromValue", to_lower_camel(&e.name));
+        writeln!(out, "describe('{}', () => {{", e.name).unwrap();
+        writeln!(out, "  it('fromValue roundtrip', () => {{").unwrap();
+        for v in &e.variants {
+            writeln!(out, "    expect({fn_name}({}.{})).toBe({}.{});", e.name, v.name, e.name, v.name).unwrap();
+        }
+        out.push_str("  });\n");
+        writeln!(out, "  it('fromValue returns undefined for invalid', () => {{").unwrap();
+        writeln!(out, "    expect({fn_name}(65535)).toBeUndefined();").unwrap();
+        out.push_str("  });\n");
+        out.push_str("});\n\n");
+    }
+
+    // Bitflags tests
+    for b in &ir.bitflags {
+        writeln!(out, "describe('{}', () => {{", b.name).unwrap();
+
+        let first = &b.flags[0].name;
+        let second = if b.flags.len() > 1 {
+            &b.flags[1].name
+        } else {
+            first
+        };
+
+        writeln!(out, "  it('contains', () => {{").unwrap();
+        writeln!(out, "    expect({}.contains({}.{first}, {}.{first})).toBe(true);", b.name, b.name, b.name).unwrap();
+        if b.flags.len() > 1 {
+            writeln!(out, "    expect({}.contains({}.{first}, {}.{second})).toBe(false);", b.name, b.name, b.name).unwrap();
+        }
+        out.push_str("  });\n");
+
+        writeln!(out, "  it('add and remove', () => {{").unwrap();
+        writeln!(out, "    let flags = {}.add({}.{first}, {}.{second});", b.name, b.name, b.name).unwrap();
+        writeln!(out, "    expect({}.contains(flags, {}.{first})).toBe(true);", b.name, b.name).unwrap();
+        writeln!(out, "    expect({}.contains(flags, {}.{second})).toBe(true);", b.name, b.name).unwrap();
+        writeln!(out, "    flags = {}.remove(flags, {}.{first});", b.name, b.name).unwrap();
+        writeln!(out, "    expect({}.contains(flags, {}.{first})).toBe(false);", b.name, b.name).unwrap();
+        writeln!(out, "    expect({}.contains(flags, {}.{second})).toBe(true);", b.name, b.name).unwrap();
+        out.push_str("  });\n");
+
+        writeln!(out, "  it('toggle', () => {{").unwrap();
+        writeln!(out, "    let flags = {}.{first};", b.name).unwrap();
+        writeln!(out, "    flags = {}.toggle(flags, {}.{first});", b.name, b.name).unwrap();
+        out.push_str("    expect(flags).toBe(0);\n");
+        writeln!(out, "    flags = {}.toggle(flags, {}.{first});", b.name, b.name).unwrap();
+        writeln!(out, "    expect(flags).toBe({}.{first});", b.name).unwrap();
+        out.push_str("  });\n");
+
+        out.push_str("});\n\n");
+    }
+
+    out
+}
+
+// ---------------------------------------------------------------------------
+// 5.3 — TS codec test
+// ---------------------------------------------------------------------------
+
+fn emit_codec_test_ts(ir: &ParsedModule) -> String {
+    let mut out = String::from(HEADER);
+    out.push_str("\nimport { describe, it, expect } from 'vitest';\nimport {\n  ProtocolWriter,\n  ProtocolReader,\n");
+
+    // Collect imports
+    let mut imports = BTreeSet::new();
+    for s in &ir.structs {
+        imports.insert(format!("encode{}", s.name));
+        imports.insert(format!("decode{}", s.name));
+        // Import enum/bitflags values used in fixtures
+        for f in &s.fields {
+            collect_test_imports(&f.ty, ir, &mut imports);
+        }
+    }
+    for t in &ir.tagged_enums {
+        if SKIP_TAGGED_ENUMS.contains(&t.name.as_str()) {
+            continue;
+        }
+        imports.insert(format!("encode{}", t.name));
+        imports.insert(format!("decode{}", t.name));
+        for v in &t.variants {
+            match &v.kind {
+                VariantKind::Unit => {}
+                VariantKind::Tuple(types) => {
+                    for ty in types {
+                        collect_test_imports(ty, ir, &mut imports);
+                    }
+                }
+                VariantKind::Struct(fields) => {
+                    for f in fields {
+                        collect_test_imports(&f.ty, ir, &mut imports);
+                    }
+                }
+            }
+        }
+    }
+    // Frame imports
+    imports.insert("encodeFrame".into());
+    imports.insert("decodeFrame".into());
+    imports.insert("encodeFrameHeader".into());
+    imports.insert("decodeFrameHeader".into());
+    imports.insert("FrameKind".into());
+
+    for i in &imports {
+        writeln!(out, "  {i},").unwrap();
+    }
+    out.push_str("} from '../src/index.js';\n");
+    // Type-only imports for struct/tagged interfaces
+    let mut type_imports = BTreeSet::new();
+    for s in &ir.structs {
+        type_imports.insert(s.name.clone());
+        for f in &s.fields {
+            collect_type_imports(&f.ty, &mut type_imports);
+        }
+    }
+    for t in &ir.tagged_enums {
+        if SKIP_TAGGED_ENUMS.contains(&t.name.as_str()) {
+            continue;
+        }
+        type_imports.insert(t.name.clone());
+    }
+    // Remove imports that are already in value imports (enums, bitflags, functions)
+    let type_only: Vec<_> = type_imports.difference(&imports).cloned().collect();
+    if !type_only.is_empty() {
+        out.push_str("import type {\n");
+        for t in &type_only {
+            writeln!(out, "  {t},").unwrap();
+        }
+        out.push_str("} from '../src/index.js';\n");
+    }
+
+    out.push('\n');
+
+    // Struct codec roundtrip tests
+    for s in &ir.structs {
+        writeln!(out, "describe('{} codec', () => {{", s.name).unwrap();
+        let fixture = ts_struct_fixture(&s.name, ir);
+        writeln!(out, "  it('roundtrip', () => {{").unwrap();
+        writeln!(out, "    const original: {} = {};", s.name, fixture).unwrap();
+        out.push_str("    const w = new ProtocolWriter();\n");
+        writeln!(out, "    encode{}(w, original);", s.name).unwrap();
+        writeln!(out, "    const decoded = decode{}(new ProtocolReader(w.toBytes()));", s.name).unwrap();
+        out.push_str("    expect(decoded).toEqual(original);\n");
+        out.push_str("  });\n");
+
+        // Null edge case
+        if let Some(null_fixture) = ts_struct_fixture_nulls(&s.name, ir) {
+            writeln!(out, "  it('roundtrip with nulls', () => {{").unwrap();
+            writeln!(out, "    const original: {} = {};", s.name, null_fixture).unwrap();
+            out.push_str("    const w = new ProtocolWriter();\n");
+            writeln!(out, "    encode{}(w, original);", s.name).unwrap();
+            writeln!(out, "    const decoded = decode{}(new ProtocolReader(w.toBytes()));", s.name).unwrap();
+            out.push_str("    expect(decoded).toEqual(original);\n");
+            out.push_str("  });\n");
+        }
+
+        out.push_str("});\n\n");
+    }
+
+    // Tagged enum codec roundtrip tests
+    for t in &ir.tagged_enums {
+        if SKIP_TAGGED_ENUMS.contains(&t.name.as_str()) {
+            continue;
+        }
+        writeln!(out, "describe('{} codec', () => {{", t.name).unwrap();
+        let variants = ts_tagged_enum_all_variants(&t.name, ir);
+        for (vname, expr) in &variants {
+            writeln!(out, "  it('{vname} roundtrip', () => {{").unwrap();
+            writeln!(out, "    const original: {} = {};", t.name, expr).unwrap();
+            out.push_str("    const w = new ProtocolWriter();\n");
+            writeln!(out, "    encode{}(w, original);", t.name).unwrap();
+            writeln!(out, "    const decoded = decode{}(new ProtocolReader(w.toBytes()));", t.name).unwrap();
+            out.push_str("    expect(decoded).toEqual(original);\n");
+            out.push_str("  });\n");
+        }
+        out.push_str("});\n\n");
+    }
+
+    // Frame header roundtrip
+    out.push_str("describe('FrameHeader codec', () => {\n");
+    out.push_str("  it('roundtrip', () => {\n");
+    out.push_str("    const header = { kind: FrameKind.Hello, seq: 42, eventSeq: 7 };\n");
+    out.push_str("    const w = new ProtocolWriter();\n");
+    out.push_str("    encodeFrameHeader(w, header);\n");
+    out.push_str("    const decoded = decodeFrameHeader(new ProtocolReader(w.toBytes()));\n");
+    out.push_str("    expect(decoded).toEqual(header);\n");
+    out.push_str("  });\n");
+    out.push_str("});\n\n");
+
+    // Frame roundtrip tests
+    out.push_str("describe('Frame codec', () => {\n");
+
+    out.push_str("  it('Ping frame roundtrip (no payload)', () => {\n");
+    out.push_str("    const frame = { seq: 1, eventSeq: 0, payload: { type: 'ping' as const } };\n");
+    out.push_str("    const w = new ProtocolWriter();\n");
+    out.push_str("    encodeFrame(w, frame);\n");
+    out.push_str("    const decoded = decodeFrame(new ProtocolReader(w.toBytes()));\n");
+    out.push_str("    expect(decoded).toEqual(frame);\n");
+    out.push_str("  });\n\n");
+
+    out.push_str("  it('DeleteMessage frame roundtrip (struct payload)', () => {\n");
+    out.push_str("    const frame = { seq: 5, eventSeq: 3, payload: { type: 'deleteMessage' as const, data: { chatId: 1, messageId: 2 } } };\n");
+    out.push_str("    const w = new ProtocolWriter();\n");
+    out.push_str("    encodeFrame(w, frame);\n");
+    out.push_str("    const decoded = decodeFrame(new ProtocolReader(w.toBytes()));\n");
+    out.push_str("    expect(decoded).toEqual(frame);\n");
+    out.push_str("  });\n\n");
+
+    out.push_str("  it('LoadChats frame roundtrip (tagged enum payload)', () => {\n");
+    out.push_str("    const frame = { seq: 10, eventSeq: 0, payload: { type: 'loadChats' as const, data: { type: 'firstPage' as const, limit: 50 } } };\n");
+    out.push_str("    const w = new ProtocolWriter();\n");
+    out.push_str("    encodeFrame(w, frame);\n");
+    out.push_str("    const decoded = decodeFrame(new ProtocolReader(w.toBytes()));\n");
+    out.push_str("    expect(decoded).toEqual(frame);\n");
+    out.push_str("  });\n\n");
+
+    out.push_str("  it('Ack frame roundtrip (raw bytes)', () => {\n");
+    out.push_str("    const frame = { seq: 20, eventSeq: 0, payload: { type: 'ack' as const, data: new Uint8Array([1, 2, 3, 4]) } };\n");
+    out.push_str("    const w = new ProtocolWriter();\n");
+    out.push_str("    encodeFrame(w, frame);\n");
+    out.push_str("    const decoded = decodeFrame(new ProtocolReader(w.toBytes()));\n");
+    out.push_str("    expect(decoded).toEqual(frame);\n");
+    out.push_str("  });\n");
+
+    out.push_str("});\n");
+    out
+}
+
+/// Collect value imports needed for test fixtures (enum values, bitflags).
+fn collect_test_imports(ty: &FieldType, ir: &ParsedModule, imports: &mut BTreeSet<String>) {
+    match ty {
+        FieldType::Enum(name) => {
+            imports.insert(name.clone());
+        }
+        FieldType::Bitflags(name) | FieldType::OptionalBitflags(name) => {
+            imports.insert(name.clone());
+        }
+        FieldType::Struct(name) | FieldType::OptionalStruct(name)
+        | FieldType::VecStruct(name) | FieldType::OptionalVecStruct(name) => {
+            // Recurse into struct fields
+            if let Some(s) = ir.structs.iter().find(|s| s.name == *name) {
+                for f in &s.fields {
+                    collect_test_imports(&f.ty, ir, imports);
+                }
+            }
+        }
+        FieldType::TaggedEnum(name) => {
+            if let Some(t) = ir.tagged_enums.iter().find(|t| t.name == *name) {
+                for v in &t.variants {
+                    match &v.kind {
+                        VariantKind::Unit => {}
+                        VariantKind::Tuple(types) => {
+                            for ty in types {
+                                collect_test_imports(ty, ir, imports);
+                            }
+                        }
+                        VariantKind::Struct(fields) => {
+                            for f in fields {
+                                collect_test_imports(&f.ty, ir, imports);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Collect type-only imports for TS interfaces/types.
+fn collect_type_imports(ty: &FieldType, imports: &mut BTreeSet<String>) {
+    match ty {
+        FieldType::Struct(n) | FieldType::OptionalStruct(n)
+        | FieldType::VecStruct(n) | FieldType::OptionalVecStruct(n) => {
+            imports.insert(n.clone());
+        }
+        FieldType::TaggedEnum(n) => {
+            imports.insert(n.clone());
+        }
+        _ => {}
+    }
 }

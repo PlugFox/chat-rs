@@ -7,24 +7,34 @@
 enum DisconnectCode {
   /// Graceful server restart.
   serverShutdown(3000),
+
   /// Token expired mid-session.
   sessionExpired(3001),
+
   /// Same device_id connected from another location.
   duplicateSession(3002),
+
   /// Unrecoverable internal server error.
   serverError(3003),
+
   /// Client send buffer exceeded capacity.
   bufferOverflow(3004),
+
   /// Too many requests on this connection, backoff.
   rateLimited(3005),
+
   /// event_seq approaching u32 limit — reconnect to reset counter.
   eventSeqOverflow(3006),
+
   /// Token is malformed or has invalid signature.
   tokenInvalid(3500),
+
   /// User is banned.
   banned(3501),
+
   /// Protocol version not supported by server.
   unsupportedVersion(3502),
+
   /// Max connections per IP/user exceeded.
   connectionLimit(3503);
 

@@ -11,8 +11,10 @@ class GetChatMembersPayload {
 
   /// Target chat.
   final int chatId;
+
   /// Pagination cursor (0 = first page).
   final int cursor;
+
   /// Max members to return.
   final int limit;
 
@@ -25,12 +27,9 @@ class GetChatMembersPayload {
           limit == other.limit;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        cursor,
-        limit,
-      );
+  int get hashCode => Object.hash(chatId, cursor, limit);
 
   @override
-  String toString() => 'GetChatMembersPayload(chatId: $chatId, cursor: $cursor, limit: $limit)';
+  String toString() =>
+      'GetChatMembersPayload(chatId: $chatId, cursor: $cursor, limit: $limit)';
 }

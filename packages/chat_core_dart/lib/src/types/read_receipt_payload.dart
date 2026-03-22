@@ -3,13 +3,11 @@
 
 /// ReadReceipt frame payload (client → server, fire-and-forget).
 class ReadReceiptPayload {
-  const ReadReceiptPayload({
-    required this.chatId,
-    required this.messageId,
-  });
+  const ReadReceiptPayload({required this.chatId, required this.messageId});
 
   /// Target chat.
   final int chatId;
+
   /// Highest read message ID.
   final int messageId;
 
@@ -21,11 +19,9 @@ class ReadReceiptPayload {
           messageId == other.messageId;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        messageId,
-      );
+  int get hashCode => Object.hash(chatId, messageId);
 
   @override
-  String toString() => 'ReadReceiptPayload(chatId: $chatId, messageId: $messageId)';
+  String toString() =>
+      'ReadReceiptPayload(chatId: $chatId, messageId: $messageId)';
 }

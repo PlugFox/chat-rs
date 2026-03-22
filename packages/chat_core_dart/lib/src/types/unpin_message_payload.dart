@@ -3,13 +3,11 @@
 
 /// UnpinMessage frame payload (client → server).
 class UnpinMessagePayload {
-  const UnpinMessagePayload({
-    required this.chatId,
-    required this.messageId,
-  });
+  const UnpinMessagePayload({required this.chatId, required this.messageId});
 
   /// Target chat.
   final int chatId;
+
   /// Message to unpin.
   final int messageId;
 
@@ -21,11 +19,9 @@ class UnpinMessagePayload {
           messageId == other.messageId;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        messageId,
-      );
+  int get hashCode => Object.hash(chatId, messageId);
 
   @override
-  String toString() => 'UnpinMessagePayload(chatId: $chatId, messageId: $messageId)';
+  String toString() =>
+      'UnpinMessagePayload(chatId: $chatId, messageId: $messageId)';
 }

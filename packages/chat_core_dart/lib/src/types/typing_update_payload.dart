@@ -11,8 +11,10 @@ class TypingUpdatePayload {
 
   /// Chat where typing is happening.
   final int chatId;
+
   /// User who is typing.
   final int userId;
+
   /// How long this typing indicator is valid, in milliseconds.
   final int expiresInMs;
 
@@ -25,12 +27,9 @@ class TypingUpdatePayload {
           expiresInMs == other.expiresInMs;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        userId,
-        expiresInMs,
-      );
+  int get hashCode => Object.hash(chatId, userId, expiresInMs);
 
   @override
-  String toString() => 'TypingUpdatePayload(chatId: $chatId, userId: $userId, expiresInMs: $expiresInMs)';
+  String toString() =>
+      'TypingUpdatePayload(chatId: $chatId, userId: $userId, expiresInMs: $expiresInMs)';
 }

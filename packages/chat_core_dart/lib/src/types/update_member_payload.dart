@@ -17,8 +17,10 @@ class UpdateMemberPayload {
 
   /// Target chat.
   final int chatId;
+
   /// Target user.
   final int userId;
+
   /// Action to perform.
   final MemberAction action;
 
@@ -31,12 +33,9 @@ class UpdateMemberPayload {
           action == other.action;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        userId,
-        action,
-      );
+  int get hashCode => Object.hash(chatId, userId, action);
 
   @override
-  String toString() => 'UpdateMemberPayload(chatId: $chatId, userId: $userId, action: $action)';
+  String toString() =>
+      'UpdateMemberPayload(chatId: $chatId, userId: $userId, action: $action)';
 }

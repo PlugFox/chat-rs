@@ -7,9 +7,7 @@ import '../_util.dart';
 ///
 /// Unsubscribes from one or more named channels.
 class UnsubscribePayload {
-  const UnsubscribePayload({
-    required this.channels,
-  });
+  const UnsubscribePayload({required this.channels});
 
   /// Channel names to unsubscribe from.
   final List<String> channels;
@@ -17,8 +15,7 @@ class UnsubscribePayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UnsubscribePayload &&
-          listEquals(channels, other.channels);
+      other is UnsubscribePayload && listEquals(channels, other.channels);
 
   @override
   int get hashCode => Object.hashAll(channels);

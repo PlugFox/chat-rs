@@ -5,9 +5,7 @@ import '../_util.dart';
 
 /// GetPresence frame payload (client → server).
 class GetPresencePayload {
-  const GetPresencePayload({
-    required this.userIds,
-  });
+  const GetPresencePayload({required this.userIds});
 
   /// User IDs to query.
   final List<int> userIds;
@@ -15,8 +13,7 @@ class GetPresencePayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is GetPresencePayload &&
-          listEquals(userIds, other.userIds);
+      other is GetPresencePayload && listEquals(userIds, other.userIds);
 
   @override
   int get hashCode => Object.hashAll(userIds);

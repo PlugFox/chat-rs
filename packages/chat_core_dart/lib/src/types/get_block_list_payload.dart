@@ -3,13 +3,11 @@
 
 /// GetBlockList frame payload (client → server, RPC).
 class GetBlockListPayload {
-  const GetBlockListPayload({
-    required this.cursor,
-    required this.limit,
-  });
+  const GetBlockListPayload({required this.cursor, required this.limit});
 
   /// Pagination cursor (0 = first page).
   final int cursor;
+
   /// Max entries to return.
   final int limit;
 
@@ -21,10 +19,7 @@ class GetBlockListPayload {
           limit == other.limit;
 
   @override
-  int get hashCode => Object.hash(
-        cursor,
-        limit,
-      );
+  int get hashCode => Object.hash(cursor, limit);
 
   @override
   String toString() => 'GetBlockListPayload(cursor: $cursor, limit: $limit)';

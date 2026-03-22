@@ -5,13 +5,11 @@ import '../_util.dart';
 
 /// InviteMembers frame payload (client → server).
 class InviteMembersPayload {
-  const InviteMembersPayload({
-    required this.chatId,
-    required this.userIds,
-  });
+  const InviteMembersPayload({required this.chatId, required this.userIds});
 
   /// Target chat.
   final int chatId;
+
   /// User IDs to invite.
   final List<int> userIds;
 
@@ -23,11 +21,9 @@ class InviteMembersPayload {
           listEquals(userIds, other.userIds);
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        Object.hashAll(userIds),
-      );
+  int get hashCode => Object.hash(chatId, Object.hashAll(userIds));
 
   @override
-  String toString() => 'InviteMembersPayload(chatId: $chatId, userIds: $userIds)';
+  String toString() =>
+      'InviteMembersPayload(chatId: $chatId, userIds: $userIds)';
 }

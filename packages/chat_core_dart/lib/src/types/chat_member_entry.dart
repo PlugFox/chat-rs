@@ -14,8 +14,10 @@ class ChatMemberEntry {
 
   /// Internal user ID.
   final int userId;
+
   /// Member's role.
   final ChatRole role;
+
   /// Permission override. `None` = use role defaults.
   final Permission? permissions;
 
@@ -28,12 +30,9 @@ class ChatMemberEntry {
           permissions == other.permissions;
 
   @override
-  int get hashCode => Object.hash(
-        userId,
-        role,
-        permissions,
-      );
+  int get hashCode => Object.hash(userId, role, permissions);
 
   @override
-  String toString() => 'ChatMemberEntry(userId: $userId, role: $role, permissions: $permissions)';
+  String toString() =>
+      'ChatMemberEntry(userId: $userId, role: $role, permissions: $permissions)';
 }

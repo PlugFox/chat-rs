@@ -31,7 +31,12 @@ void encodeChatEntry(ProtocolWriter w, ChatEntry v) {
   w.writeTimestamp(v.updatedAt);
   w.writeOptionalString(v.title);
   w.writeOptionalString(v.avatarUrl);
-  if (v.lastMessage != null) { w.writeU8(1); encodeLastMessagePreview(w, v.lastMessage!); } else { w.writeU8(0); }
+  if (v.lastMessage != null) {
+    w.writeU8(1);
+    encodeLastMessagePreview(w, v.lastMessage!);
+  } else {
+    w.writeU8(0);
+  }
   w.writeU32(v.unreadCount);
   w.writeU32(v.memberCount);
 }
@@ -54,7 +59,12 @@ ChatEntry decodeChatEntry(ProtocolReader r) {
 void encodeChatMemberEntry(ProtocolWriter w, ChatMemberEntry v) {
   w.writeU32(v.userId);
   w.writeU8(v.role.value);
-  if (v.permissions != null) { w.writeU8(1); w.writeU32(v.permissions!.value); } else { w.writeU8(0); }
+  if (v.permissions != null) {
+    w.writeU8(1);
+    w.writeU32(v.permissions!.value);
+  } else {
+    w.writeU8(0);
+  }
 }
 
 ChatMemberEntry decodeChatMemberEntry(ProtocolReader r) {
@@ -186,7 +196,9 @@ void encodeSendMessagePayload(ProtocolWriter w, SendMessagePayload v) {
   w.writeOptionalBytes(v.richContent);
   w.writeOptionalString(v.extra);
   w.writeU16(v.mentionedUserIds.length);
-  for (final v in v.mentionedUserIds) { w.writeU32(v); }
+  for (final v in v.mentionedUserIds) {
+    w.writeU32(v);
+  }
 }
 
 SendMessagePayload decodeSendMessagePayload(ProtocolReader r) {
@@ -226,10 +238,7 @@ void encodeDeleteMessagePayload(ProtocolWriter w, DeleteMessagePayload v) {
 }
 
 DeleteMessagePayload decodeDeleteMessagePayload(ProtocolReader r) {
-  return DeleteMessagePayload(
-    chatId: r.readU32(),
-    messageId: r.readU32(),
-  );
+  return DeleteMessagePayload(chatId: r.readU32(), messageId: r.readU32());
 }
 
 void encodeReadReceiptPayload(ProtocolWriter w, ReadReceiptPayload v) {
@@ -238,10 +247,7 @@ void encodeReadReceiptPayload(ProtocolWriter w, ReadReceiptPayload v) {
 }
 
 ReadReceiptPayload decodeReadReceiptPayload(ProtocolReader r) {
-  return ReadReceiptPayload(
-    chatId: r.readU32(),
-    messageId: r.readU32(),
-  );
+  return ReadReceiptPayload(chatId: r.readU32(), messageId: r.readU32());
 }
 
 void encodeTypingPayload(ProtocolWriter w, TypingPayload v) {
@@ -250,21 +256,18 @@ void encodeTypingPayload(ProtocolWriter w, TypingPayload v) {
 }
 
 TypingPayload decodeTypingPayload(ProtocolReader r) {
-  return TypingPayload(
-    chatId: r.readU32(),
-    expiresInMs: r.readU16(),
-  );
+  return TypingPayload(chatId: r.readU32(), expiresInMs: r.readU16());
 }
 
 void encodeGetPresencePayload(ProtocolWriter w, GetPresencePayload v) {
   w.writeU16(v.userIds.length);
-  for (final v in v.userIds) { w.writeU32(v); }
+  for (final v in v.userIds) {
+    w.writeU32(v);
+  }
 }
 
 GetPresencePayload decodeGetPresencePayload(ProtocolReader r) {
-  return GetPresencePayload(
-    userIds: r.readVecU32(),
-  );
+  return GetPresencePayload(userIds: r.readVecU32());
 }
 
 void encodeSearchPayload(ProtocolWriter w, SearchPayload v) {
@@ -285,24 +288,24 @@ SearchPayload decodeSearchPayload(ProtocolReader r) {
 
 void encodeSubscribePayload(ProtocolWriter w, SubscribePayload v) {
   w.writeU16(v.channels.length);
-  for (final v in v.channels) { w.writeString(v); }
+  for (final v in v.channels) {
+    w.writeString(v);
+  }
 }
 
 SubscribePayload decodeSubscribePayload(ProtocolReader r) {
-  return SubscribePayload(
-    channels: r.readVecString(),
-  );
+  return SubscribePayload(channels: r.readVecString());
 }
 
 void encodeUnsubscribePayload(ProtocolWriter w, UnsubscribePayload v) {
   w.writeU16(v.channels.length);
-  for (final v in v.channels) { w.writeString(v); }
+  for (final v in v.channels) {
+    w.writeString(v);
+  }
 }
 
 UnsubscribePayload decodeUnsubscribePayload(ProtocolReader r) {
-  return UnsubscribePayload(
-    channels: r.readVecString(),
-  );
+  return UnsubscribePayload(channels: r.readVecString());
 }
 
 void encodeCreateChatPayload(ProtocolWriter w, CreateChatPayload v) {
@@ -311,7 +314,9 @@ void encodeCreateChatPayload(ProtocolWriter w, CreateChatPayload v) {
   w.writeOptionalString(v.title);
   w.writeOptionalString(v.avatarUrl);
   w.writeU16(v.memberIds.length);
-  for (final v in v.memberIds) { w.writeU32(v); }
+  for (final v in v.memberIds) {
+    w.writeU32(v);
+  }
 }
 
 CreateChatPayload decodeCreateChatPayload(ProtocolReader r) {
@@ -343,9 +348,7 @@ void encodeDeleteChatPayload(ProtocolWriter w, DeleteChatPayload v) {
 }
 
 DeleteChatPayload decodeDeleteChatPayload(ProtocolReader r) {
-  return DeleteChatPayload(
-    chatId: r.readU32(),
-  );
+  return DeleteChatPayload(chatId: r.readU32());
 }
 
 void encodeGetChatInfoPayload(ProtocolWriter w, GetChatInfoPayload v) {
@@ -353,9 +356,7 @@ void encodeGetChatInfoPayload(ProtocolWriter w, GetChatInfoPayload v) {
 }
 
 GetChatInfoPayload decodeGetChatInfoPayload(ProtocolReader r) {
-  return GetChatInfoPayload(
-    chatId: r.readU32(),
-  );
+  return GetChatInfoPayload(chatId: r.readU32());
 }
 
 void encodeGetChatMembersPayload(ProtocolWriter w, GetChatMembersPayload v) {
@@ -375,14 +376,13 @@ GetChatMembersPayload decodeGetChatMembersPayload(ProtocolReader r) {
 void encodeInviteMembersPayload(ProtocolWriter w, InviteMembersPayload v) {
   w.writeU32(v.chatId);
   w.writeU16(v.userIds.length);
-  for (final v in v.userIds) { w.writeU32(v); }
+  for (final v in v.userIds) {
+    w.writeU32(v);
+  }
 }
 
 InviteMembersPayload decodeInviteMembersPayload(ProtocolReader r) {
-  return InviteMembersPayload(
-    chatId: r.readU32(),
-    userIds: r.readVecU32(),
-  );
+  return InviteMembersPayload(chatId: r.readU32(), userIds: r.readVecU32());
 }
 
 void encodeLeaveChatPayload(ProtocolWriter w, LeaveChatPayload v) {
@@ -390,9 +390,7 @@ void encodeLeaveChatPayload(ProtocolWriter w, LeaveChatPayload v) {
 }
 
 LeaveChatPayload decodeLeaveChatPayload(ProtocolReader r) {
-  return LeaveChatPayload(
-    chatId: r.readU32(),
-  );
+  return LeaveChatPayload(chatId: r.readU32());
 }
 
 void encodeUpdateMemberPayload(ProtocolWriter w, UpdateMemberPayload v) {
@@ -415,10 +413,7 @@ void encodeMessageDeletedPayload(ProtocolWriter w, MessageDeletedPayload v) {
 }
 
 MessageDeletedPayload decodeMessageDeletedPayload(ProtocolReader r) {
-  return MessageDeletedPayload(
-    chatId: r.readU32(),
-    messageId: r.readU32(),
-  );
+  return MessageDeletedPayload(chatId: r.readU32(), messageId: r.readU32());
 }
 
 void encodeReceiptUpdatePayload(ProtocolWriter w, ReceiptUpdatePayload v) {
@@ -471,10 +466,7 @@ void encodeMemberLeftPayload(ProtocolWriter w, MemberLeftPayload v) {
 }
 
 MemberLeftPayload decodeMemberLeftPayload(ProtocolReader r) {
-  return MemberLeftPayload(
-    chatId: r.readU32(),
-    userId: r.readU32(),
-  );
+  return MemberLeftPayload(chatId: r.readU32(), userId: r.readU32());
 }
 
 void encodeChatDeletedPayload(ProtocolWriter w, ChatDeletedPayload v) {
@@ -482,16 +474,19 @@ void encodeChatDeletedPayload(ProtocolWriter w, ChatDeletedPayload v) {
 }
 
 ChatDeletedPayload decodeChatDeletedPayload(ProtocolReader r) {
-  return ChatDeletedPayload(
-    chatId: r.readU32(),
-  );
+  return ChatDeletedPayload(chatId: r.readU32());
 }
 
 void encodeMemberUpdatedPayload(ProtocolWriter w, MemberUpdatedPayload v) {
   w.writeU32(v.chatId);
   w.writeU32(v.userId);
   w.writeU8(v.role.value);
-  if (v.permissions != null) { w.writeU8(1); w.writeU32(v.permissions!.value); } else { w.writeU8(0); }
+  if (v.permissions != null) {
+    w.writeU8(1);
+    w.writeU32(v.permissions!.value);
+  } else {
+    w.writeU8(0);
+  }
 }
 
 MemberUpdatedPayload decodeMemberUpdatedPayload(ProtocolReader r) {
@@ -561,10 +556,7 @@ void encodePinMessagePayload(ProtocolWriter w, PinMessagePayload v) {
 }
 
 PinMessagePayload decodePinMessagePayload(ProtocolReader r) {
-  return PinMessagePayload(
-    chatId: r.readU32(),
-    messageId: r.readU32(),
-  );
+  return PinMessagePayload(chatId: r.readU32(), messageId: r.readU32());
 }
 
 void encodeUnpinMessagePayload(ProtocolWriter w, UnpinMessagePayload v) {
@@ -573,10 +565,7 @@ void encodeUnpinMessagePayload(ProtocolWriter w, UnpinMessagePayload v) {
 }
 
 UnpinMessagePayload decodeUnpinMessagePayload(ProtocolReader r) {
-  return UnpinMessagePayload(
-    chatId: r.readU32(),
-    messageId: r.readU32(),
-  );
+  return UnpinMessagePayload(chatId: r.readU32(), messageId: r.readU32());
 }
 
 void encodeRefreshTokenPayload(ProtocolWriter w, RefreshTokenPayload v) {
@@ -584,9 +573,7 @@ void encodeRefreshTokenPayload(ProtocolWriter w, RefreshTokenPayload v) {
 }
 
 RefreshTokenPayload decodeRefreshTokenPayload(ProtocolReader r) {
-  return RefreshTokenPayload(
-    token: r.readString(),
-  );
+  return RefreshTokenPayload(token: r.readString());
 }
 
 void encodeForwardMessagePayload(ProtocolWriter w, ForwardMessagePayload v) {
@@ -610,20 +597,18 @@ void encodeGetUserPayload(ProtocolWriter w, GetUserPayload v) {
 }
 
 GetUserPayload decodeGetUserPayload(ProtocolReader r) {
-  return GetUserPayload(
-    userId: r.readU32(),
-  );
+  return GetUserPayload(userId: r.readU32());
 }
 
 void encodeGetUsersPayload(ProtocolWriter w, GetUsersPayload v) {
   w.writeU16(v.userIds.length);
-  for (final v in v.userIds) { w.writeU32(v); }
+  for (final v in v.userIds) {
+    w.writeU32(v);
+  }
 }
 
 GetUsersPayload decodeGetUsersPayload(ProtocolReader r) {
-  return GetUsersPayload(
-    userIds: r.readVecU32(),
-  );
+  return GetUsersPayload(userIds: r.readVecU32());
 }
 
 void encodeUpdateProfilePayload(ProtocolWriter w, UpdateProfilePayload v) {
@@ -647,9 +632,7 @@ void encodeBlockUserPayload(ProtocolWriter w, BlockUserPayload v) {
 }
 
 BlockUserPayload decodeBlockUserPayload(ProtocolReader r) {
-  return BlockUserPayload(
-    userId: r.readU32(),
-  );
+  return BlockUserPayload(userId: r.readU32());
 }
 
 void encodeUnblockUserPayload(ProtocolWriter w, UnblockUserPayload v) {
@@ -657,9 +640,7 @@ void encodeUnblockUserPayload(ProtocolWriter w, UnblockUserPayload v) {
 }
 
 UnblockUserPayload decodeUnblockUserPayload(ProtocolReader r) {
-  return UnblockUserPayload(
-    userId: r.readU32(),
-  );
+  return UnblockUserPayload(userId: r.readU32());
 }
 
 void encodeGetBlockListPayload(ProtocolWriter w, GetBlockListPayload v) {
@@ -668,10 +649,7 @@ void encodeGetBlockListPayload(ProtocolWriter w, GetBlockListPayload v) {
 }
 
 GetBlockListPayload decodeGetBlockListPayload(ProtocolReader r) {
-  return GetBlockListPayload(
-    cursor: r.readU32(),
-    limit: r.readU16(),
-  );
+  return GetBlockListPayload(cursor: r.readU32(), limit: r.readU16());
 }
 
 void encodeMuteChatPayload(ProtocolWriter w, MuteChatPayload v) {
@@ -680,10 +658,7 @@ void encodeMuteChatPayload(ProtocolWriter w, MuteChatPayload v) {
 }
 
 MuteChatPayload decodeMuteChatPayload(ProtocolReader r) {
-  return MuteChatPayload(
-    chatId: r.readU32(),
-    durationSecs: r.readU32(),
-  );
+  return MuteChatPayload(chatId: r.readU32(), durationSecs: r.readU32());
 }
 
 void encodeUnmuteChatPayload(ProtocolWriter w, UnmuteChatPayload v) {
@@ -691,16 +666,16 @@ void encodeUnmuteChatPayload(ProtocolWriter w, UnmuteChatPayload v) {
 }
 
 UnmuteChatPayload decodeUnmuteChatPayload(ProtocolReader r) {
-  return UnmuteChatPayload(
-    chatId: r.readU32(),
-  );
+  return UnmuteChatPayload(chatId: r.readU32());
 }
 
 void encodeErrorPayload(ProtocolWriter w, ErrorPayload v) {
   w.writeU16(v.code.value);
   final slug = v.code.slug;
   w.writeU8(slug.length);
-  for (var i = 0; i < slug.length; i++) { w.writeU8(slug.codeUnitAt(i)); }
+  for (var i = 0; i < slug.length; i++) {
+    w.writeU8(slug.codeUnitAt(i));
+  }
   w.writeString(v.message);
   w.writeU32(v.retryAfterMs);
   w.writeOptionalString(v.extra);
@@ -730,12 +705,13 @@ void encodeMessage(ProtocolWriter w, Message v) {
   w.writeOptionU32(v.replyToId);
   w.writeString(v.content);
   if (v.richContent != null) {
-    final tmp = ProtocolWriter();
-    tmp.writeU16(v.richContent!.length);
-    for (final span in v.richContent!) { encodeRichSpan(tmp, span); }
-    final blob = tmp.toBytes();
-    w.writeU32(blob.length);
-    w.writeRawBytes(blob);
+    final lenOffset = w.reserve(4);
+    final blobStart = w.length;
+    w.writeU16(v.richContent!.length);
+    for (final span in v.richContent!) {
+      encodeRichSpan(w, span);
+    }
+    w.patchU32(lenOffset, w.length - blobStart);
   } else {
     w.writeU32(0);
   }
@@ -760,13 +736,27 @@ Message decodeMessage(ProtocolReader r) {
     richContent = rr.readArray(rr.readU16(), () => decodeRichSpan(rr));
   }
   final extra = r.readOptionalString();
-  return Message(id: id, chatId: chatId, senderId: senderId, createdAt: createdAt, updatedAt: updatedAt, kind: kind, flags: flags, replyToId: replyToId, content: content, richContent: richContent, extra: extra);
+  return Message(
+    id: id,
+    chatId: chatId,
+    senderId: senderId,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    kind: kind,
+    flags: flags,
+    replyToId: replyToId,
+    content: content,
+    richContent: richContent,
+    extra: extra,
+  );
 }
 
 void encodeMessageBatch(ProtocolWriter w, MessageBatch v) {
   w.writeU8(v.hasMore ? 1 : 0);
   w.writeU32(v.messages.length);
-  for (final msg in v.messages) { encodeMessage(w, msg); }
+  for (final msg in v.messages) {
+    encodeMessage(w, msg);
+  }
 }
 
 MessageBatch decodeMessageBatch(ProtocolReader r) {
@@ -840,8 +830,18 @@ LoadMessagesPayload decodeLoadMessagesPayload(ProtocolReader r) {
   final chatId = r.readU32();
   final d = r.readU8();
   return switch (d) {
-    0 => LoadMessagesPaginate(chatId: chatId, direction: LoadDirection.fromValue(r.readU8())!, anchorId: r.readU32(), limit: r.readU16()),
-    1 => LoadMessagesRangeCheck(chatId: chatId, fromId: r.readU32(), toId: r.readU32(), sinceTs: r.readTimestamp()),
+    0 => LoadMessagesPaginate(
+      chatId: chatId,
+      direction: LoadDirection.fromValue(r.readU8())!,
+      anchorId: r.readU32(),
+      limit: r.readU16(),
+    ),
+    1 => LoadMessagesRangeCheck(
+      chatId: chatId,
+      fromId: r.readU32(),
+      toId: r.readU32(),
+      sinceTs: r.readTimestamp(),
+    ),
     _ => throw CodecError('unknown LoadMessagesPayload mode: $d'),
   };
 }
@@ -878,4 +878,3 @@ MemberAction decodeMemberAction(ProtocolReader r) {
     _ => throw CodecError('unknown MemberAction discriminant: $d'),
   };
 }
-

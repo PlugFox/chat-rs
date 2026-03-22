@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { UserFlags } from './user-flags.js';
+import type { UserFlags } from "./user-flags.js";
 
 /**
  * A user entry as transmitted on the wire (PresenceResult, user lookups).

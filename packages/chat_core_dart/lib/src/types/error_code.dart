@@ -8,48 +8,70 @@
 enum ErrorCode {
   /// Invalid token.
   unauthorized(1000),
+
   /// Token expired.
   tokenExpired(1001),
+
   /// No permission.
   forbidden(1002),
+
   /// Session revoked.
   sessionRevoked(1003),
+
   /// Protocol version not supported.
   unsupportedVersion(1004),
+
   /// Chat doesn't exist.
   chatNotFound(2000),
+
   /// Direct chat already exists between these users.
   chatAlreadyExists(2001),
+
   /// User is not a member of this chat.
   notChatMember(2002),
+
   /// Member limit reached for this chat.
   chatFull(2003),
+
   /// Message doesn't exist.
   messageNotFound(3000),
+
   /// Content exceeds max_message_size limit.
   messageTooLarge(3001),
+
   /// Extra JSON exceeds max_extra_size limit.
   extraTooLarge(3002),
+
   /// Too many messages — retry after `retry_after_ms`.
   rateLimited(3003),
+
   /// Content interceptor/filter rejected the message.
   contentFiltered(3004),
+
   /// File exceeds upload size limit.
   fileTooLarge(4000),
+
   /// File type not allowed.
   unsupportedMediaType(4001),
+
   /// Upload processing error.
   uploadFailed(4002),
+
   /// Server internal error.
   internalError(5000),
+
   /// Service temporarily unavailable.
   serviceUnavailable(5001),
+
   /// Database error.
   databaseError(5002),
+
   /// Bad frame format / cannot decode.
   malformedFrame(9000),
+
   /// Unknown frame kind byte.
   unknownCommand(9001),
+
   /// Frame exceeds max_frame_size.
   frameTooLarge(9002);
 
@@ -112,7 +134,13 @@ enum ErrorCode {
 
   /// Whether this error is permanent (do not retry).
   bool get isPermanent => switch (this) {
-    forbidden || chatNotFound || notChatMember || messageTooLarge || extraTooLarge || contentFiltered || unsupportedMediaType => true,
+    forbidden ||
+    chatNotFound ||
+    notChatMember ||
+    messageTooLarge ||
+    extraTooLarge ||
+    contentFiltered ||
+    unsupportedMediaType => true,
     _ => false,
   };
 

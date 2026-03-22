@@ -17,10 +17,13 @@ class RichSpan {
 
   /// Start byte offset into the plain-text content (inclusive).
   final int start;
+
   /// End byte offset into the plain-text content (exclusive).
   final int end;
+
   /// Style flags for this span.
   final RichStyle style;
+
   /// Optional JSON metadata. `None` when no meta-bearing style bits are set.
   final String? meta;
 
@@ -34,13 +37,9 @@ class RichSpan {
           meta == other.meta;
 
   @override
-  int get hashCode => Object.hash(
-        start,
-        end,
-        style,
-        meta,
-      );
+  int get hashCode => Object.hash(start, end, style, meta);
 
   @override
-  String toString() => 'RichSpan(start: $start, end: $end, style: $style, meta: $meta)';
+  String toString() =>
+      'RichSpan(start: $start, end: $end, style: $style, meta: $meta)';
 }

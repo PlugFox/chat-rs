@@ -3,13 +3,11 @@
 
 /// PinMessage frame payload (client → server).
 class PinMessagePayload {
-  const PinMessagePayload({
-    required this.chatId,
-    required this.messageId,
-  });
+  const PinMessagePayload({required this.chatId, required this.messageId});
 
   /// Target chat.
   final int chatId;
+
   /// Message to pin.
   final int messageId;
 
@@ -21,11 +19,9 @@ class PinMessagePayload {
           messageId == other.messageId;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        messageId,
-      );
+  int get hashCode => Object.hash(chatId, messageId);
 
   @override
-  String toString() => 'PinMessagePayload(chatId: $chatId, messageId: $messageId)';
+  String toString() =>
+      'PinMessagePayload(chatId: $chatId, messageId: $messageId)';
 }

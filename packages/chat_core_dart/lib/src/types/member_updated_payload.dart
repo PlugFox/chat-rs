@@ -17,10 +17,13 @@ class MemberUpdatedPayload {
 
   /// Target chat.
   final int chatId;
+
   /// User whose membership changed.
   final int userId;
+
   /// New role.
   final ChatRole role;
+
   /// New permission override. `None` = use role defaults.
   final Permission? permissions;
 
@@ -34,13 +37,9 @@ class MemberUpdatedPayload {
           permissions == other.permissions;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        userId,
-        role,
-        permissions,
-      );
+  int get hashCode => Object.hash(chatId, userId, role, permissions);
 
   @override
-  String toString() => 'MemberUpdatedPayload(chatId: $chatId, userId: $userId, role: $role, permissions: $permissions)';
+  String toString() =>
+      'MemberUpdatedPayload(chatId: $chatId, userId: $userId, role: $role, permissions: $permissions)';
 }

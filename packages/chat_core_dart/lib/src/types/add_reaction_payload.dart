@@ -12,10 +12,13 @@ class AddReactionPayload {
 
   /// Target chat.
   final int chatId;
+
   /// Target message.
   final int messageId;
+
   /// Emoji pack ID (0 = built-in Unicode set).
   final int packId;
+
   /// Emoji index within the pack (0–255).
   final int emojiIndex;
 
@@ -29,13 +32,9 @@ class AddReactionPayload {
           emojiIndex == other.emojiIndex;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        messageId,
-        packId,
-        emojiIndex,
-      );
+  int get hashCode => Object.hash(chatId, messageId, packId, emojiIndex);
 
   @override
-  String toString() => 'AddReactionPayload(chatId: $chatId, messageId: $messageId, packId: $packId, emojiIndex: $emojiIndex)';
+  String toString() =>
+      'AddReactionPayload(chatId: $chatId, messageId: $messageId, packId: $packId, emojiIndex: $emojiIndex)';
 }

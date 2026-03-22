@@ -19,14 +19,19 @@ class LastMessagePreview {
 
   /// Message ID.
   final int id;
+
   /// Sender's internal user ID.
   final int senderId;
+
   /// Creation timestamp, Unix seconds.
   final int createdAt;
+
   /// Content type.
   final MessageKind kind;
+
   /// Message property flags.
   final MessageFlags flags;
+
   /// Truncated plain-text preview (server-side, up to 100 bytes UTF-8).
   final String contentPreview;
 
@@ -42,15 +47,10 @@ class LastMessagePreview {
           contentPreview == other.contentPreview;
 
   @override
-  int get hashCode => Object.hash(
-        id,
-        senderId,
-        createdAt,
-        kind,
-        flags,
-        contentPreview,
-      );
+  int get hashCode =>
+      Object.hash(id, senderId, createdAt, kind, flags, contentPreview);
 
   @override
-  String toString() => 'LastMessagePreview(id: $id, senderId: $senderId, createdAt: $createdAt, kind: $kind, flags: $flags, contentPreview: $contentPreview)';
+  String toString() =>
+      'LastMessagePreview(id: $id, senderId: $senderId, createdAt: $createdAt, kind: $kind, flags: $flags, contentPreview: $contentPreview)';
 }

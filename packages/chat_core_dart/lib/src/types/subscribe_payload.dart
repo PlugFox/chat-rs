@@ -14,9 +14,7 @@ import '../_util.dart';
 /// This channel-based model decouples subscription from specific chat IDs,
 /// allowing flexible event routing and future extensibility.
 class SubscribePayload {
-  const SubscribePayload({
-    required this.channels,
-  });
+  const SubscribePayload({required this.channels});
 
   /// Channel names to subscribe to.
   final List<String> channels;
@@ -24,8 +22,7 @@ class SubscribePayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SubscribePayload &&
-          listEquals(channels, other.channels);
+      other is SubscribePayload && listEquals(channels, other.channels);
 
   @override
   int get hashCode => Object.hashAll(channels);

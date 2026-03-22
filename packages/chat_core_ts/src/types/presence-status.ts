@@ -10,7 +10,9 @@ export const enum PresenceStatus {
 }
 
 /** Convert wire value to PresenceStatus, or undefined if unknown. */
-export function presenceStatusFromValue(value: number): PresenceStatus | undefined {
+export function presenceStatusFromValue(
+  value: number,
+): PresenceStatus | undefined {
   if (value >= 0 && value <= 1) return value as PresenceStatus;
   return undefined;
 }

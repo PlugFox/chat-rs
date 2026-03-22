@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { ChatKind } from './chat-kind.js';
+import type { ChatKind } from "./chat-kind.js";
 
 /** CreateChat frame payload (client → server). */
 export interface CreateChatPayload {

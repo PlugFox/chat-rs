@@ -3,9 +3,7 @@
 
 /// UnblockUser frame payload (client → server, RPC).
 class UnblockUserPayload {
-  const UnblockUserPayload({
-    required this.userId,
-  });
+  const UnblockUserPayload({required this.userId});
 
   /// User to unblock.
   final int userId;
@@ -13,8 +11,7 @@ class UnblockUserPayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UnblockUserPayload &&
-          userId == other.userId;
+      other is UnblockUserPayload && userId == other.userId;
 
   @override
   int get hashCode => userId.hashCode;

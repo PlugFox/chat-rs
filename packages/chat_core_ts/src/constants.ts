@@ -24,4 +24,4 @@ export const maxTimestamp = (1 << 41) - 1;
  * the server should send `DisconnectCode::EventSeqOverflow` and close
  * so the client reconnects with a fresh counter.
  */
-export const eventSeqOverflowMask = 0xC000_0000;
+export const eventSeqOverflowMask = 0xc000_0000;

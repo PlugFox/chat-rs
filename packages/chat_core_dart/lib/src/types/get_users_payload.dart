@@ -5,9 +5,7 @@ import '../_util.dart';
 
 /// GetUsers frame payload (client → server, RPC).
 class GetUsersPayload {
-  const GetUsersPayload({
-    required this.userIds,
-  });
+  const GetUsersPayload({required this.userIds});
 
   /// User IDs to look up (batch).
   final List<int> userIds;
@@ -15,8 +13,7 @@ class GetUsersPayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is GetUsersPayload &&
-          listEquals(userIds, other.userIds);
+      other is GetUsersPayload && listEquals(userIds, other.userIds);
 
   @override
   int get hashCode => Object.hashAll(userIds);

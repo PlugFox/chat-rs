@@ -3,13 +3,11 @@
 
 /// Typing frame payload (client → server, fire-and-forget).
 class TypingPayload {
-  const TypingPayload({
-    required this.chatId,
-    required this.expiresInMs,
-  });
+  const TypingPayload({required this.chatId, required this.expiresInMs});
 
   /// Target chat.
   final int chatId;
+
   /// How long this typing indicator is valid, in milliseconds.
   /// Server and other clients use this to auto-expire the indicator.
   final int expiresInMs;
@@ -22,11 +20,9 @@ class TypingPayload {
           expiresInMs == other.expiresInMs;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        expiresInMs,
-      );
+  int get hashCode => Object.hash(chatId, expiresInMs);
 
   @override
-  String toString() => 'TypingPayload(chatId: $chatId, expiresInMs: $expiresInMs)';
+  String toString() =>
+      'TypingPayload(chatId: $chatId, expiresInMs: $expiresInMs)';
 }

@@ -3,13 +3,11 @@
 
 /// DeleteMessage frame payload (client → server).
 class DeleteMessagePayload {
-  const DeleteMessagePayload({
-    required this.chatId,
-    required this.messageId,
-  });
+  const DeleteMessagePayload({required this.chatId, required this.messageId});
 
   /// Target chat.
   final int chatId;
+
   /// Message to delete.
   final int messageId;
 
@@ -21,11 +19,9 @@ class DeleteMessagePayload {
           messageId == other.messageId;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        messageId,
-      );
+  int get hashCode => Object.hash(chatId, messageId);
 
   @override
-  String toString() => 'DeleteMessagePayload(chatId: $chatId, messageId: $messageId)';
+  String toString() =>
+      'DeleteMessagePayload(chatId: $chatId, messageId: $messageId)';
 }

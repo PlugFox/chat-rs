@@ -1,8 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { MessageFlags } from './message-flags.js';
-import type { MessageKind } from './message-kind.js';
+import type { MessageFlags } from "./message-flags.js";
+import type { MessageKind } from "./message-kind.js";
 
 /**
  * Lightweight last-message preview included in `ChatEntry`.

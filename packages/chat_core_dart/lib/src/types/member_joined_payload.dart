@@ -14,10 +14,13 @@ class MemberJoinedPayload {
 
   /// Target chat.
   final int chatId;
+
   /// User who joined.
   final int userId;
+
   /// Role assigned to the new member.
   final ChatRole role;
+
   /// User who invited them. `0` = self-join (e.g. via invite link).
   final int invitedBy;
 
@@ -31,13 +34,9 @@ class MemberJoinedPayload {
           invitedBy == other.invitedBy;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        userId,
-        role,
-        invitedBy,
-      );
+  int get hashCode => Object.hash(chatId, userId, role, invitedBy);
 
   @override
-  String toString() => 'MemberJoinedPayload(chatId: $chatId, userId: $userId, role: $role, invitedBy: $invitedBy)';
+  String toString() =>
+      'MemberJoinedPayload(chatId: $chatId, userId: $userId, role: $role, invitedBy: $invitedBy)';
 }

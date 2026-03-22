@@ -32,25 +32,41 @@ export const enum DisconnectCode {
 }
 
 /** Convert wire value to DisconnectCode, or undefined if unknown. */
-export function disconnectCodeFromValue(value: number): DisconnectCode | undefined {
+export function disconnectCodeFromValue(
+  value: number,
+): DisconnectCode | undefined {
   switch (value) {
-    case 3000: return DisconnectCode.ServerShutdown;
-    case 3001: return DisconnectCode.SessionExpired;
-    case 3002: return DisconnectCode.DuplicateSession;
-    case 3003: return DisconnectCode.ServerError;
-    case 3004: return DisconnectCode.BufferOverflow;
-    case 3005: return DisconnectCode.RateLimited;
-    case 3006: return DisconnectCode.EventSeqOverflow;
-    case 3500: return DisconnectCode.TokenInvalid;
-    case 3501: return DisconnectCode.Banned;
-    case 3502: return DisconnectCode.UnsupportedVersion;
-    case 3503: return DisconnectCode.ConnectionLimit;
-    default: return undefined;
+    case 3000:
+      return DisconnectCode.ServerShutdown;
+    case 3001:
+      return DisconnectCode.SessionExpired;
+    case 3002:
+      return DisconnectCode.DuplicateSession;
+    case 3003:
+      return DisconnectCode.ServerError;
+    case 3004:
+      return DisconnectCode.BufferOverflow;
+    case 3005:
+      return DisconnectCode.RateLimited;
+    case 3006:
+      return DisconnectCode.EventSeqOverflow;
+    case 3500:
+      return DisconnectCode.TokenInvalid;
+    case 3501:
+      return DisconnectCode.Banned;
+    case 3502:
+      return DisconnectCode.UnsupportedVersion;
+    case 3503:
+      return DisconnectCode.ConnectionLimit;
+    default:
+      return undefined;
   }
 }
 
 /** Whether the client should attempt reconnection. */
 export function shouldReconnect(code: DisconnectCode): boolean {
   const v = code as number;
-  return (v >= 0 && v < 1000) || (v >= 3000 && v < 3500) || (v >= 4000 && v < 4500);
+  return (
+    (v >= 0 && v < 1000) || (v >= 3000 && v < 3500) || (v >= 4000 && v < 4500)
+  );
 }

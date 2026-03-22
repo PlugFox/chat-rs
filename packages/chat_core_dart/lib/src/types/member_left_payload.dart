@@ -3,13 +3,11 @@
 
 /// MemberLeft event payload (server → client).
 class MemberLeftPayload {
-  const MemberLeftPayload({
-    required this.chatId,
-    required this.userId,
-  });
+  const MemberLeftPayload({required this.chatId, required this.userId});
 
   /// Target chat.
   final int chatId;
+
   /// User who left.
   final int userId;
 
@@ -21,10 +19,7 @@ class MemberLeftPayload {
           userId == other.userId;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        userId,
-      );
+  int get hashCode => Object.hash(chatId, userId);
 
   @override
   String toString() => 'MemberLeftPayload(chatId: $chatId, userId: $userId)';

@@ -1,8 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { ChatKind } from './chat-kind.js';
-import type { LastMessagePreview } from './last-message-preview.js';
+import type { ChatKind } from "./chat-kind.js";
+import type { LastMessagePreview } from "./last-message-preview.js";
 
 /** A chat entry as transmitted on the wire (LoadChats, ChatCreated, ChatUpdated). */
 export interface ChatEntry {

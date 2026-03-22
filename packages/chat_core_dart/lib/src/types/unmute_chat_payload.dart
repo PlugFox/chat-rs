@@ -3,9 +3,7 @@
 
 /// UnmuteChat frame payload (client → server, RPC).
 class UnmuteChatPayload {
-  const UnmuteChatPayload({
-    required this.chatId,
-  });
+  const UnmuteChatPayload({required this.chatId});
 
   /// Target chat.
   final int chatId;
@@ -13,8 +11,7 @@ class UnmuteChatPayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UnmuteChatPayload &&
-          chatId == other.chatId;
+      other is UnmuteChatPayload && chatId == other.chatId;
 
   @override
   int get hashCode => chatId.hashCode;

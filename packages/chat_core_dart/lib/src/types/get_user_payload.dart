@@ -3,9 +3,7 @@
 
 /// GetUser frame payload (client → server, RPC).
 class GetUserPayload {
-  const GetUserPayload({
-    required this.userId,
-  });
+  const GetUserPayload({required this.userId});
 
   /// User ID to look up.
   final int userId;
@@ -13,8 +11,7 @@ class GetUserPayload {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is GetUserPayload &&
-          userId == other.userId;
+      other is GetUserPayload && userId == other.userId;
 
   @override
   int get hashCode => userId.hashCode;

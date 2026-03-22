@@ -13,12 +13,16 @@ class HelloPayload {
 
   /// Protocol version the client supports.
   final int protocolVersion;
+
   /// Client SDK version string (e.g. "1.0.0").
   final String sdkVersion;
+
   /// Client platform string (e.g. "dart", "typescript", "rust").
   final String platform;
+
   /// JWT authentication token.
   final String token;
+
   /// Unique device identifier (UUID v4, 16 bytes on wire).
   final String deviceId;
 
@@ -33,14 +37,10 @@ class HelloPayload {
           deviceId == other.deviceId;
 
   @override
-  int get hashCode => Object.hash(
-        protocolVersion,
-        sdkVersion,
-        platform,
-        token,
-        deviceId,
-      );
+  int get hashCode =>
+      Object.hash(protocolVersion, sdkVersion, platform, token, deviceId);
 
   @override
-  String toString() => 'HelloPayload(protocolVersion: $protocolVersion, sdkVersion: $sdkVersion, platform: $platform, token: $token, deviceId: $deviceId)';
+  String toString() =>
+      'HelloPayload(protocolVersion: $protocolVersion, sdkVersion: $sdkVersion, platform: $platform, token: $token, deviceId: $deviceId)';
 }

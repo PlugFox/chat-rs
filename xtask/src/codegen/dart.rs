@@ -39,15 +39,29 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
     let types_dir = output_dir.join("lib/src/types");
     let src_dir = output_dir.join("lib/src");
     let lib_dir = output_dir.join("lib");
+    let codec_dir = output_dir.join("lib/src/codec");
+    let test_dir = output_dir.join("test");
 
     fs::create_dir_all(&types_dir).context("creating types dir")?;
-    fs::create_dir_all(output_dir.join("lib/src/codec")).context("creating codec dir")?;
-    fs::create_dir_all(output_dir.join("test")).context("creating test dir")?;
+    fs::create_dir_all(&codec_dir).context("creating codec dir")?;
+    fs::create_dir_all(&test_dir).context("creating test dir")?;
 
+    // -- Static scaffolding (written only if missing) -------------------------
+    write_if_missing(&output_dir.join("pubspec.yaml"), &emit_pubspec())?;
+    write_if_missing(&codec_dir.join("error.dart"), &emit_codec_error_dart())?;
+    write_if_missing(&codec_dir.join("reader.dart"), &emit_reader_dart())?;
+    write_if_missing(&codec_dir.join("writer.dart"), &emit_writer_dart())?;
+
+    let needs_util = ir
+        .structs
+        .iter()
+        .any(|s| s.fields.iter().any(|f| is_list_type(&f.ty)));
+    if needs_util {
+        write_if_missing(&src_dir.join("_util.dart"), &emit_util())?;
+    }
+
+    // -- Generated from IR (always overwritten) -------------------------------
     let mut exports: Vec<String> = Vec::new();
-
-    // pubspec.yaml
-    write_file(&output_dir.join("pubspec.yaml"), &emit_pubspec())?;
 
     // Enums
     for e in &ir.enums {
@@ -61,15 +75,6 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
         let fname = format!("{}.dart", to_snake_case(&b.name));
         write_file(&types_dir.join(&fname), &emit_bitflags(b))?;
         exports.push(format!("src/types/{fname}"));
-    }
-
-    // Emit _util.dart if any struct has list fields
-    let needs_util = ir
-        .structs
-        .iter()
-        .any(|s| s.fields.iter().any(|f| is_list_type(&f.ty)));
-    if needs_util {
-        write_file(&src_dir.join("_util.dart"), &emit_util())?;
     }
 
     // Structs
@@ -95,11 +100,7 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
         exports.push("src/protocol_constants.dart".into());
     }
 
-    // Codec files (Phase 4)
-    let codec_dir = output_dir.join("lib/src/codec");
-    write_file(&codec_dir.join("error.dart"), &emit_codec_error_dart())?;
-    write_file(&codec_dir.join("reader.dart"), &emit_reader_dart())?;
-    write_file(&codec_dir.join("writer.dart"), &emit_writer_dart())?;
+    // Codec (IR-dependent)
     write_file(&codec_dir.join("codecs.dart"), &emit_codecs_dart(ir))?;
     write_file(&codec_dir.join("frame.dart"), &emit_frame_codec_dart(ir))?;
 
@@ -113,8 +114,12 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
     exports.sort();
     write_file(&lib_dir.join("chat_core.dart"), &emit_barrel(&exports))?;
 
+    // Tests
+    write_file(&test_dir.join("types_test.dart"), &emit_types_test_dart(ir))?;
+    write_file(&test_dir.join("codec_test.dart"), &emit_codec_test_dart(ir))?;
+
     eprintln!(
-        "Dart: {} enums, {} bitflags, {} structs, {} tagged enums, {} constants + codec",
+        "Dart: {} enums, {} bitflags, {} structs, {} tagged enums, {} constants + codec + tests",
         ir.enums.len(),
         ir.bitflags.len(),
         ir.structs.len(),
@@ -127,6 +132,16 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
 
 fn write_file(path: &Path, content: &str) -> Result<()> {
     fs::write(path, content).with_context(|| format!("writing {}", path.display()))
+}
+
+/// Write file only if it does not already exist. Scaffolding files (pubspec,
+/// reader, writer, error) are stable — they don't depend on IR and may be
+/// hand-edited (e.g. adding dev_dependencies or optimising hot paths).
+fn write_if_missing(path: &Path, content: &str) -> Result<()> {
+    if !path.exists() {
+        fs::write(path, content).with_context(|| format!("writing {}", path.display()))?;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -359,6 +374,7 @@ fn emit_pubspec() -> String {
         "environment:",
         "  sdk: ^3.7.0",
         "dev_dependencies:",
+        "  benchmark_harness: ^2.3.0",
         "  lints: ^6.0.0",
         "  test: ^1.25.0",
         "",
@@ -620,12 +636,67 @@ fn emit_struct(s: &StructDef) -> String {
     out
 }
 
+/// Emit ==, hashCode, toString for a tagged enum variant subclass with fields.
+fn emit_variant_equality(out: &mut String, class_name: &str, field_names: &[&str], field_types: &[FieldType]) {
+    // ==
+    out.push('\n');
+    out.push_str("  @override\n");
+    out.push_str("  bool operator ==(Object other) =>\n");
+    write!(out, "      identical(this, other) ||\n      other is {class_name}").unwrap();
+    for (name, ty) in field_names.iter().zip(field_types.iter()) {
+        if is_list_type(ty) {
+            write!(out, " &&\n          listEquals({name}, other.{name})").unwrap();
+        } else {
+            write!(out, " &&\n          {name} == other.{name}").unwrap();
+        }
+    }
+    out.push_str(";\n");
+
+    // hashCode
+    out.push('\n');
+    out.push_str("  @override\n");
+    if field_names.len() == 1 {
+        let name = field_names[0];
+        let ty = &field_types[0];
+        if is_list_type(ty) {
+            if is_nullable(ty) {
+                writeln!(out, "  int get hashCode => Object.hashAll({name} ?? const []);").unwrap();
+            } else {
+                writeln!(out, "  int get hashCode => Object.hashAll({name});").unwrap();
+            }
+        } else {
+            writeln!(out, "  int get hashCode => {name}.hashCode;").unwrap();
+        }
+    } else {
+        out.push_str("  int get hashCode => Object.hash(\n");
+        for (name, ty) in field_names.iter().zip(field_types.iter()) {
+            if is_list_type(ty) {
+                if is_nullable(ty) {
+                    writeln!(out, "        Object.hashAll({name} ?? const []),").unwrap();
+                } else {
+                    writeln!(out, "        Object.hashAll({name}),").unwrap();
+                }
+            } else {
+                writeln!(out, "        {name},").unwrap();
+            }
+        }
+        out.push_str("      );\n");
+    }
+
+    // toString
+    out.push('\n');
+    out.push_str("  @override\n");
+    let parts: Vec<String> = field_names.iter().map(|n| format!("{n}: ${n}")).collect();
+    writeln!(out, "  String toString() => '{class_name}({})';", parts.join(", ")).unwrap();
+}
+
 fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
     let mut out = String::from(HEADER);
 
     // Collect imports from all variant fields
     let mut type_refs = BTreeSet::new();
     let mut has_typed_data = false;
+    let mut has_list = false;
 
     for v in &t.variants {
         match &v.kind {
@@ -635,6 +706,9 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
                     if needs_typed_data(ty) {
                         has_typed_data = true;
                     }
+                    if is_list_type(ty) {
+                        has_list = true;
+                    }
                     collect_field_refs(ty, &mut type_refs);
                 }
             }
@@ -643,13 +717,16 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
                     if needs_typed_data(&f.ty) {
                         has_typed_data = true;
                     }
+                    if is_list_type(&f.ty) {
+                        has_list = true;
+                    }
                     collect_field_refs(&f.ty, &mut type_refs);
                 }
             }
         }
     }
 
-    emit_import_block(&mut out, has_typed_data, false, &type_refs);
+    emit_import_block(&mut out, has_typed_data, has_list, &type_refs);
     out.push('\n');
 
     // Sealed base class
@@ -670,6 +747,16 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
             VariantKind::Unit => {
                 writeln!(out, "class {class_name} extends {} {{", t.name).unwrap();
                 writeln!(out, "  const {class_name}();").unwrap();
+                // == / hashCode / toString for unit variant
+                out.push('\n');
+                out.push_str("  @override\n");
+                writeln!(out, "  bool operator ==(Object other) => identical(this, other) || other is {class_name};").unwrap();
+                out.push('\n');
+                out.push_str("  @override\n");
+                out.push_str("  int get hashCode => 0;\n");
+                out.push('\n');
+                out.push_str("  @override\n");
+                writeln!(out, "  String toString() => '{class_name}()';").unwrap();
                 out.push_str("}\n");
             }
             VariantKind::Tuple(types) => {
@@ -701,6 +788,8 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
                     writeln!(out, "  final {ty} {name};").unwrap();
                 }
 
+                // == / hashCode / toString
+                emit_variant_equality(&mut out, &class_name, &fields.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(), types);
                 out.push_str("}\n");
             }
             VariantKind::Struct(fields) => {
@@ -708,6 +797,16 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
 
                 if fields.is_empty() {
                     writeln!(out, "  const {class_name}();").unwrap();
+                    // == / hashCode / toString for empty struct variant
+                    out.push('\n');
+                    out.push_str("  @override\n");
+                    writeln!(out, "  bool operator ==(Object other) => identical(this, other) || other is {class_name};").unwrap();
+                    out.push('\n');
+                    out.push_str("  @override\n");
+                    out.push_str("  int get hashCode => 0;\n");
+                    out.push('\n');
+                    out.push_str("  @override\n");
+                    writeln!(out, "  String toString() => '{class_name}()';").unwrap();
                 } else {
                     // Constructor
                     writeln!(out, "  const {class_name}({{").unwrap();
@@ -733,6 +832,12 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
                         )
                         .unwrap();
                     }
+
+                    // == / hashCode / toString
+                    let names: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
+                    let types: Vec<FieldType> = fields.iter().map(|f| f.ty.clone()).collect();
+                    let dart_names: Vec<String> = names.iter().map(|n| to_camel_case(n)).collect();
+                    emit_variant_equality(&mut out, &class_name, &dart_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), &types);
                 }
 
                 out.push_str("}\n");
@@ -1021,12 +1126,11 @@ fn dart_emit_message_codec(out: &mut String) {
          \x20 w.writeOptionU32(v.replyToId);\n\
          \x20 w.writeString(v.content);\n\
          \x20 if (v.richContent != null) {\n\
-         \x20   final tmp = ProtocolWriter();\n\
-         \x20   tmp.writeU16(v.richContent!.length);\n\
-         \x20   for (final span in v.richContent!) { encodeRichSpan(tmp, span); }\n\
-         \x20   final blob = tmp.toBytes();\n\
-         \x20   w.writeU32(blob.length);\n\
-         \x20   w.writeRawBytes(blob);\n\
+         \x20   final lenOffset = w.reserve(4);\n\
+         \x20   final blobStart = w.length;\n\
+         \x20   w.writeU16(v.richContent!.length);\n\
+         \x20   for (final span in v.richContent!) { encodeRichSpan(w, span); }\n\
+         \x20   w.patchU32(lenOffset, w.length - blobStart);\n\
          \x20 } else {\n\
          \x20   w.writeU32(0);\n\
          \x20 }\n\
@@ -1428,7 +1532,7 @@ class ProtocolReader {{\n\
     final len = readU32();\n\
     if (len == 0) return '';\n\
     ensureRemaining(len);\n\
-    final s = utf8.decode(_bytes.sublist(_pos, _pos + len));\n\
+    final s = _decodeUtf8(len);\n\
     _pos += len;\n\
     return s;\n\
   }}\n\
@@ -1437,16 +1541,29 @@ class ProtocolReader {{\n\
     final len = readU32();\n\
     if (len == 0) return null;\n\
     ensureRemaining(len);\n\
-    final s = utf8.decode(_bytes.sublist(_pos, _pos + len));\n\
+    final s = _decodeUtf8(len);\n\
     _pos += len;\n\
     return s;\n\
+  }}\n\
+\n\
+  /// Decode [len] bytes at current position as UTF-8.\n\
+  /// Fast path: if all bytes are ASCII, build string directly.\n\
+  String _decodeUtf8(int len) {{\n\
+    bool ascii = true;\n\
+    for (var i = 0; i < len; i++) {{\n\
+      if (_bytes[_pos + i] > 0x7F) {{ ascii = false; break; }}\n\
+    }}\n\
+    if (ascii) {{\n\
+      return String.fromCharCodes(_bytes, _pos, _pos + len);\n\
+    }}\n\
+    return utf8.decode(Uint8List.sublistView(_bytes, _pos, _pos + len));\n\
   }}\n\
 \n\
   Uint8List? readOptionalBytes() {{\n\
     final len = readU32();\n\
     if (len == 0) return null;\n\
     ensureRemaining(len);\n\
-    final out = Uint8List.fromList(_bytes.sublist(_pos, _pos + len));\n\
+    final out = Uint8List.sublistView(_bytes, _pos, _pos + len);\n\
     _pos += len;\n\
     return out;\n\
   }}\n\
@@ -1476,7 +1593,7 @@ class ProtocolReader {{\n\
 \n\
   Uint8List readBytes(int n) {{\n\
     ensureRemaining(n);\n\
-    final out = Uint8List.fromList(_bytes.sublist(_pos, _pos + n));\n\
+    final out = Uint8List.sublistView(_bytes, _pos, _pos + n);\n\
     _pos += n;\n\
     return out;\n\
   }}\n\
@@ -1510,12 +1627,19 @@ import 'error.dart';\n\
 \n\
 class ProtocolWriter {{\n\
   ProtocolWriter([int initialCapacity = 256])\n\
-      : _buf = Uint8List(initialCapacity),\n\
-        _data = ByteData(initialCapacity);\n\
+      : _buf = Uint8List(initialCapacity) {{\n\
+    _data = ByteData.sublistView(_buf);\n\
+  }}\n\
 \n\
   Uint8List _buf;\n\
-  ByteData _data;\n\
+  late ByteData _data;\n\
   int _pos = 0;\n\
+\n\
+  /// Reset position to zero, reusing the existing buffer.\n\
+  void reset() {{ _pos = 0; }}\n\
+\n\
+  /// Current number of bytes written.\n\
+  int get length => _pos;\n\
 \n\
   void _grow(int needed) {{\n\
     final required = _pos + needed;\n\
@@ -1523,7 +1647,7 @@ class ProtocolWriter {{\n\
     var newLen = _buf.length * 2;\n\
     while (newLen < required) {{{{ newLen *= 2; }}}}\n\
     final next = Uint8List(newLen);\n\
-    next.setAll(0, _buf);\n\
+    next.setAll(0, Uint8List.sublistView(_buf, 0, _pos));\n\
     _buf = next;\n\
     _data = ByteData.sublistView(next);\n\
   }}\n\
@@ -1549,11 +1673,23 @@ class ProtocolWriter {{\n\
 \n\
   void writeString(String v) {{\n\
     if (v.isEmpty) {{ writeU32(0); return; }}\n\
-    final encoded = utf8.encode(v);\n\
-    writeU32(encoded.length);\n\
-    _grow(encoded.length);\n\
-    _buf.setAll(_pos, encoded);\n\
-    _pos += encoded.length;\n\
+    // Fast path: pure ASCII — avoid utf8.encode() allocation.\n\
+    if (_isAscii(v)) {{\n\
+      writeU32(v.length);\n\
+      _grow(v.length);\n\
+      for (var i = 0; i < v.length; i++) {{ _buf[_pos++] = v.codeUnitAt(i); }}\n\
+    }} else {{\n\
+      final encoded = utf8.encode(v);\n\
+      writeU32(encoded.length);\n\
+      _grow(encoded.length);\n\
+      _buf.setAll(_pos, encoded);\n\
+      _pos += encoded.length;\n\
+    }}\n\
+  }}\n\
+\n\
+  static bool _isAscii(String v) {{\n\
+    for (var i = 0; i < v.length; i++) {{ if (v.codeUnitAt(i) > 0x7F) return false; }}\n\
+    return true;\n\
   }}\n\
 \n\
   void writeOptionalString(String? v) {{\n\
@@ -1570,8 +1706,11 @@ class ProtocolWriter {{\n\
 \n\
   void writeUuid(String uuid) {{\n\
     _grow(16);\n\
-    final hex = uuid.replaceAll('-', '');\n\
-    for (var i = 0; i < 16; i++) {{{{ _buf[_pos++] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16); }}}}\n\
+    for (var i = 0, j = 0; i < uuid.length && j < 16; i += 2) {{\n\
+      if (i < uuid.length && uuid.codeUnitAt(i) == 0x2D) {{ i++; }} // skip '-'\n\
+      _buf[_pos++] = (_hexVal(uuid.codeUnitAt(i)) << 4) | _hexVal(uuid.codeUnitAt(i + 1));\n\
+      j++;\n\
+    }}\n\
   }}\n\
 \n\
   void writeOptionU32(int? v) {{\n\
@@ -1588,7 +1727,26 @@ class ProtocolWriter {{\n\
     _pos += data.length;\n\
   }}\n\
 \n\
-  Uint8List toBytes() => Uint8List.fromList(_buf.sublist(0, _pos));\n\
+  /// Patch a u32 at a previously written position.\n\
+  void patchU32(int offset, int v) {{\n\
+    _data.setUint32(offset, v, Endian.little);\n\
+  }}\n\
+\n\
+  /// Reserve [n] bytes and return the offset. Caller fills them later.\n\
+  int reserve(int n) {{ _grow(n); final o = _pos; _pos += n; return o; }}\n\
+\n\
+  /// Return a copy of the written bytes.\n\
+  Uint8List toBytes() => _buf.sublist(0, _pos);\n\
+\n\
+  /// Return a view of the written bytes. Valid only until the next write/reset.\n\
+  Uint8List toBytesView() => Uint8List.sublistView(_buf, 0, _pos);\n\
+}}\n\
+\n\
+int _hexVal(int c) {{\n\
+  if (c >= 0x30 && c <= 0x39) return c - 0x30;       // '0'-'9'\n\
+  if (c >= 0x61 && c <= 0x66) return c - 0x61 + 10;   // 'a'-'f'\n\
+  if (c >= 0x41 && c <= 0x46) return c - 0x41 + 10;   // 'A'-'F'\n\
+  throw CodecError('invalid hex char: ${{String.fromCharCode(c)}}');\n\
 }}\n"
     )
 }
@@ -1608,5 +1766,442 @@ fn emit_util() -> String {
          return true;\n\
          }\n",
     );
+    out
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — Dart test generation
+// ---------------------------------------------------------------------------
+
+/// Generate a Dart expression for a test fixture value of the given field type.
+fn dart_test_value(ty: &FieldType, ir: &ParsedModule) -> String {
+    match ty {
+        FieldType::U8 => "42".into(),
+        FieldType::U16 => "1000".into(),
+        FieldType::U32 => "100000".into(),
+        FieldType::I64 => "1234567890".into(),
+        FieldType::Bool => "true".into(),
+        FieldType::String => "'hello'".into(),
+        FieldType::OptionalString => "'test'".into(),
+        FieldType::UpdatableString => "'updated'".into(),
+        FieldType::Uuid => "'550e8400-e29b-41d4-a716-446655440000'".into(),
+        FieldType::OptionalU32 => "7".into(),
+        FieldType::VecU32 => "[1, 2, 3]".into(),
+        FieldType::VecU8 => "Uint8List.fromList([1, 2, 3])".into(),
+        FieldType::OptionalBytes => "Uint8List.fromList([1, 2])".into(),
+        FieldType::VecString => "['a', 'b']".into(),
+        FieldType::Enum(name) => {
+            if let Some(e) = ir.enums.iter().find(|e| e.name == *name) {
+                format!("{}.{}", name, to_lower_camel(&e.variants[0].name))
+            } else {
+                format!("{}.values.first", name)
+            }
+        }
+        FieldType::Bitflags(name) => {
+            if let Some(b) = ir.bitflags.iter().find(|b| b.name == *name) {
+                format!("{}.{}", name, to_camel_case(&b.flags[0].name))
+            } else {
+                format!("{}(1)", name)
+            }
+        }
+        FieldType::OptionalBitflags(name) => {
+            if let Some(b) = ir.bitflags.iter().find(|b| b.name == *name) {
+                format!("{}.{}", name, to_camel_case(&b.flags[0].name))
+            } else {
+                format!("{}(1)", name)
+            }
+        }
+        FieldType::Struct(name) => dart_struct_fixture(name, ir),
+        FieldType::OptionalStruct(name) => dart_struct_fixture(name, ir),
+        FieldType::VecStruct(name) => format!("[{}]", dart_struct_fixture(name, ir)),
+        FieldType::OptionalVecStruct(name) => format!("[{}]", dart_struct_fixture(name, ir)),
+        FieldType::TaggedEnum(name) => dart_tagged_enum_fixture(name, ir),
+    }
+}
+
+/// Generate an inline Dart struct fixture expression.
+fn dart_struct_fixture(name: &str, ir: &ParsedModule) -> String {
+    let s = ir.structs.iter().find(|s| s.name == name);
+    let s = match s {
+        Some(s) => s,
+        None => return format!("const {}()", name),
+    };
+
+    let mut parts = Vec::new();
+    for f in &s.fields {
+        let dart_name = to_camel_case(&f.name);
+        let value = dart_test_value(&f.ty, ir);
+        parts.push(format!("{dart_name}: {value}"));
+    }
+    if parts.is_empty() {
+        format!("const {}()", name)
+    } else {
+        format!("{}({})", name, parts.join(", "))
+    }
+}
+
+/// Generate the first variant of a tagged enum as a Dart fixture expression.
+fn dart_tagged_enum_fixture(name: &str, ir: &ParsedModule) -> String {
+    let t = ir.tagged_enums.iter().find(|t| t.name == name);
+    let t = match t {
+        Some(t) => t,
+        None => return format!("const {}()", name),
+    };
+
+    // Find the first variant with data (or fallback to unit)
+    let base = name.strip_suffix("Payload").unwrap_or(name);
+    let v = &t.variants[0];
+    let class_name = format!("{base}{}", v.name);
+
+    match &v.kind {
+        VariantKind::Unit => format!("const {class_name}()"),
+        VariantKind::Tuple(types) => {
+            let fields: Vec<String> = types
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| {
+                    let name = if types.len() == 1 {
+                        tuple_field_name(ty)
+                    } else {
+                        format!("value{}", i + 1)
+                    };
+                    let val = dart_test_value(ty, ir);
+                    format!("{name}: {val}")
+                })
+                .collect();
+            format!("{class_name}({})", fields.join(", "))
+        }
+        VariantKind::Struct(fields) => {
+            let parts: Vec<String> = fields
+                .iter()
+                .map(|f| {
+                    let dart_name = to_camel_case(&f.name);
+                    let val = dart_test_value(&f.ty, ir);
+                    format!("{dart_name}: {val}")
+                })
+                .collect();
+            if parts.is_empty() {
+                format!("const {class_name}()")
+            } else {
+                format!("{class_name}({})", parts.join(", "))
+            }
+        }
+    }
+}
+
+/// Generate all variant fixtures for a tagged enum (for codec tests).
+fn dart_tagged_enum_all_variants(name: &str, ir: &ParsedModule) -> Vec<(String, String)> {
+    let t = match ir.tagged_enums.iter().find(|t| t.name == name) {
+        Some(t) => t,
+        None => return vec![],
+    };
+
+    let base = name.strip_suffix("Payload").unwrap_or(name);
+    t.variants
+        .iter()
+        .map(|v| {
+            let class_name = format!("{base}{}", v.name);
+            let expr = match &v.kind {
+                VariantKind::Unit => format!("const {class_name}()"),
+                VariantKind::Tuple(types) => {
+                    let fields: Vec<String> = types
+                        .iter()
+                        .enumerate()
+                        .map(|(i, ty)| {
+                            let name = if types.len() == 1 {
+                                tuple_field_name(ty)
+                            } else {
+                                format!("value{}", i + 1)
+                            };
+                            let val = dart_test_value(ty, ir);
+                            format!("{name}: {val}")
+                        })
+                        .collect();
+                    format!("{class_name}({})", fields.join(", "))
+                }
+                VariantKind::Struct(fields) => {
+                    let parts: Vec<String> = fields
+                        .iter()
+                        .map(|f| {
+                            let dart_name = to_camel_case(&f.name);
+                            let val = dart_test_value(&f.ty, ir);
+                            format!("{dart_name}: {val}")
+                        })
+                        .collect();
+                    if parts.is_empty() {
+                        format!("const {class_name}()")
+                    } else {
+                        format!("{class_name}({})", parts.join(", "))
+                    }
+                }
+            };
+            (v.name.clone(), expr)
+        })
+        .collect()
+}
+
+/// Generate a Dart struct fixture with all nullable fields set to null.
+fn dart_struct_fixture_nulls(name: &str, ir: &ParsedModule) -> Option<String> {
+    let s = ir.structs.iter().find(|s| s.name == name)?;
+    if !s.fields.iter().any(|f| is_nullable(&f.ty)) {
+        return None;
+    }
+
+    let mut parts = Vec::new();
+    for f in &s.fields {
+        let dart_name = to_camel_case(&f.name);
+        if is_nullable(&f.ty) {
+            // Leave out nullable fields — they default to null
+            continue;
+        }
+        let value = match &f.ty {
+            FieldType::String => "''".into(),
+            FieldType::VecU32 => "[]".into(),
+            FieldType::VecU8 => "Uint8List(0)".into(),
+            FieldType::VecString => "[]".into(),
+            FieldType::VecStruct(_) => "[]".into(),
+            _ => dart_test_value(&f.ty, ir),
+        };
+        parts.push(format!("{dart_name}: {value}"));
+    }
+    Some(format!("{}({})", name, parts.join(", ")))
+}
+
+// ---------------------------------------------------------------------------
+// 5.1 — Dart types test
+// ---------------------------------------------------------------------------
+
+fn emit_types_test_dart(ir: &ParsedModule) -> String {
+    let mut out = String::from(HEADER);
+    out.push_str("\nimport 'dart:typed_data';\n\nimport 'package:test/test.dart';\nimport 'package:chat_core/chat_core.dart';\n\n");
+    out.push_str("void main() {\n");
+
+    // Enum tests
+    for e in &ir.enums {
+        writeln!(out, "  group('{}', () {{", e.name).unwrap();
+        // fromValue roundtrip for all variants
+        writeln!(out, "    test('fromValue roundtrip', () {{").unwrap();
+        for v in &e.variants {
+            let variant = to_lower_camel(&v.name);
+            writeln!(out, "      expect({}.fromValue({}.{variant}.value), {}.{variant});", e.name, e.name, e.name).unwrap();
+        }
+        out.push_str("    });\n");
+        // fromValue returns null for invalid
+        writeln!(out, "    test('fromValue returns null for invalid', () {{").unwrap();
+        writeln!(out, "      expect({}.fromValue(255), isNull);", e.name).unwrap();
+        out.push_str("    });\n");
+        out.push_str("  });\n\n");
+    }
+
+    // Bitflags tests
+    for b in &ir.bitflags {
+        writeln!(out, "  group('{}', () {{", b.name).unwrap();
+        let first = to_camel_case(&b.flags[0].name);
+        let second = if b.flags.len() > 1 {
+            to_camel_case(&b.flags[1].name)
+        } else {
+            first.clone()
+        };
+
+        writeln!(out, "    test('contains', () {{").unwrap();
+        writeln!(out, "      final flags = {}.{first};", b.name).unwrap();
+        writeln!(out, "      expect(flags.contains({}.{first}), isTrue);", b.name).unwrap();
+        if b.flags.len() > 1 {
+            writeln!(out, "      expect(flags.contains({}.{second}), isFalse);", b.name).unwrap();
+        }
+        out.push_str("    });\n");
+
+        writeln!(out, "    test('add and remove', () {{").unwrap();
+        writeln!(out, "      var flags = {}.{first};", b.name).unwrap();
+        writeln!(out, "      flags = flags.add({}.{second});", b.name).unwrap();
+        writeln!(out, "      expect(flags.contains({}.{first}), isTrue);", b.name).unwrap();
+        writeln!(out, "      expect(flags.contains({}.{second}), isTrue);", b.name).unwrap();
+        writeln!(out, "      flags = flags.remove({}.{first});", b.name).unwrap();
+        writeln!(out, "      expect(flags.contains({}.{first}), isFalse);", b.name).unwrap();
+        writeln!(out, "      expect(flags.contains({}.{second}), isTrue);", b.name).unwrap();
+        out.push_str("    });\n");
+
+        writeln!(out, "    test('toggle', () {{").unwrap();
+        writeln!(out, "      var flags = {}.{first};", b.name).unwrap();
+        writeln!(out, "      flags = flags.toggle({}.{first});", b.name).unwrap();
+        writeln!(out, "      expect(flags.isEmpty, isTrue);", ).unwrap();
+        writeln!(out, "      flags = flags.toggle({}.{first});", b.name).unwrap();
+        writeln!(out, "      expect(flags.contains({}.{first}), isTrue);", b.name).unwrap();
+        out.push_str("    });\n");
+
+        writeln!(out, "    test('isEmpty', () {{").unwrap();
+        writeln!(out, "      expect(const {}(0).isEmpty, isTrue);", b.name).unwrap();
+        writeln!(out, "      expect({}.{first}.isEmpty, isFalse);", b.name).unwrap();
+        writeln!(out, "      expect({}.{first}.isNotEmpty, isTrue);", b.name).unwrap();
+        out.push_str("    });\n");
+
+        out.push_str("  });\n\n");
+    }
+
+    // Struct equality + toString tests
+    for s in &ir.structs {
+        writeln!(out, "  group('{}', () {{", s.name).unwrap();
+        let fixture = dart_struct_fixture(&s.name, ir);
+        writeln!(out, "    test('equality', () {{").unwrap();
+        writeln!(out, "      final a = {};", fixture).unwrap();
+        writeln!(out, "      final b = {};", fixture).unwrap();
+        out.push_str("      expect(a, equals(b));\n");
+        out.push_str("      expect(a.hashCode, equals(b.hashCode));\n");
+        out.push_str("    });\n");
+
+        writeln!(out, "    test('toString is not null', () {{").unwrap();
+        writeln!(out, "      final v = {};", fixture).unwrap();
+        out.push_str("      expect(v.toString(), isNotNull);\n");
+        out.push_str("      expect(v.toString(), isNotEmpty);\n");
+        out.push_str("    });\n");
+
+        out.push_str("  });\n\n");
+    }
+
+    // Tagged enum equality tests
+    for t in &ir.tagged_enums {
+        if SKIP_TAGGED_ENUMS.contains(&t.name.as_str()) {
+            continue;
+        }
+        writeln!(out, "  group('{}', () {{", t.name).unwrap();
+        let variants = dart_tagged_enum_all_variants(&t.name, ir);
+        for (vname, expr) in &variants {
+            writeln!(out, "    test('{vname} equality', () {{").unwrap();
+            writeln!(out, "      final a = {};", expr).unwrap();
+            writeln!(out, "      final b = {};", expr).unwrap();
+            out.push_str("      expect(a, equals(b));\n");
+            out.push_str("      expect(a.hashCode, equals(b.hashCode));\n");
+            out.push_str("    });\n");
+        }
+        out.push_str("  });\n\n");
+    }
+
+    out.push_str("}\n");
+    out
+}
+
+// ---------------------------------------------------------------------------
+// 5.2 — Dart codec test
+// ---------------------------------------------------------------------------
+
+fn emit_codec_test_dart(ir: &ParsedModule) -> String {
+    let mut out = String::from(HEADER);
+    out.push_str("\nimport 'dart:typed_data';\n\nimport 'package:test/test.dart';\nimport 'package:chat_core/chat_core.dart';\n\n");
+    out.push_str("void main() {\n");
+
+    // Struct codec roundtrip tests
+    for s in &ir.structs {
+        writeln!(out, "  group('{} codec', () {{", s.name).unwrap();
+        let fixture = dart_struct_fixture(&s.name, ir);
+        writeln!(out, "    test('roundtrip', () {{").unwrap();
+        writeln!(out, "      final original = {};", fixture).unwrap();
+        out.push_str("      final w = ProtocolWriter();\n");
+        writeln!(out, "      encode{}(w, original);", s.name).unwrap();
+        writeln!(out, "      final decoded = decode{}(ProtocolReader(w.toBytes()));", s.name).unwrap();
+        out.push_str("      expect(decoded, equals(original));\n");
+        out.push_str("    });\n");
+
+        // Null edge case if struct has nullable fields
+        if let Some(null_fixture) = dart_struct_fixture_nulls(&s.name, ir) {
+            writeln!(out, "    test('roundtrip with nulls', () {{").unwrap();
+            writeln!(out, "      final original = {};", null_fixture).unwrap();
+            out.push_str("      final w = ProtocolWriter();\n");
+            writeln!(out, "      encode{}(w, original);", s.name).unwrap();
+            writeln!(out, "      final decoded = decode{}(ProtocolReader(w.toBytes()));", s.name).unwrap();
+            out.push_str("      expect(decoded, equals(original));\n");
+            out.push_str("    });\n");
+        }
+
+        out.push_str("  });\n\n");
+    }
+
+    // Tagged enum codec roundtrip tests
+    for t in &ir.tagged_enums {
+        if SKIP_TAGGED_ENUMS.contains(&t.name.as_str()) {
+            continue;
+        }
+        writeln!(out, "  group('{} codec', () {{", t.name).unwrap();
+        let variants = dart_tagged_enum_all_variants(&t.name, ir);
+        for (vname, expr) in &variants {
+            writeln!(out, "    test('{vname} roundtrip', () {{").unwrap();
+            writeln!(out, "      final original = {};", expr).unwrap();
+            out.push_str("      final w = ProtocolWriter();\n");
+            writeln!(out, "      encode{}(w, original);", t.name).unwrap();
+            writeln!(out, "      final decoded = decode{}(ProtocolReader(w.toBytes()));", t.name).unwrap();
+            out.push_str("      expect(decoded, equals(original));\n");
+            out.push_str("    });\n");
+        }
+        out.push_str("  });\n\n");
+    }
+
+    // Frame header roundtrip
+    out.push_str("  group('FrameHeader codec', () {\n");
+    out.push_str("    test('roundtrip', () {\n");
+    out.push_str("      final header = FrameHeader(kind: FrameKind.hello, seq: 42, eventSeq: 7);\n");
+    out.push_str("      final w = ProtocolWriter();\n");
+    out.push_str("      encodeFrameHeader(w, header);\n");
+    out.push_str("      final decoded = decodeFrameHeader(ProtocolReader(w.toBytes()));\n");
+    out.push_str("      expect(decoded.kind, equals(header.kind));\n");
+    out.push_str("      expect(decoded.seq, equals(header.seq));\n");
+    out.push_str("      expect(decoded.eventSeq, equals(header.eventSeq));\n");
+    out.push_str("    });\n");
+    out.push_str("  });\n\n");
+
+    // Frame roundtrip tests for representative kinds
+    out.push_str("  group('Frame codec', () {\n");
+
+    // Pick representative frame kinds: one with no payload, one struct, one tagged enum, one vec struct
+    out.push_str("    test('Ping frame roundtrip (no payload)', () {\n");
+    out.push_str("      final frame = Frame(seq: 1, eventSeq: 0, payload: const FramePayloadPing());\n");
+    out.push_str("      final w = ProtocolWriter();\n");
+    out.push_str("      encodeFrame(w, frame);\n");
+    out.push_str("      final decoded = decodeFrame(ProtocolReader(w.toBytes()));\n");
+    out.push_str("      expect(decoded.seq, equals(1));\n");
+    out.push_str("      expect(decoded.eventSeq, equals(0));\n");
+    out.push_str("      expect(decoded.payload, isA<FramePayloadPing>());\n");
+    out.push_str("    });\n\n");
+
+    // Struct payload frame
+    out.push_str("    test('DeleteMessage frame roundtrip (struct payload)', () {\n");
+    out.push_str("      final payload = FramePayloadDeleteMessage(DeleteMessagePayload(chatId: 1, messageId: 2));\n");
+    out.push_str("      final frame = Frame(seq: 5, eventSeq: 3, payload: payload);\n");
+    out.push_str("      final w = ProtocolWriter();\n");
+    out.push_str("      encodeFrame(w, frame);\n");
+    out.push_str("      final decoded = decodeFrame(ProtocolReader(w.toBytes()));\n");
+    out.push_str("      expect(decoded.seq, equals(5));\n");
+    out.push_str("      expect(decoded.payload, isA<FramePayloadDeleteMessage>());\n");
+    out.push_str("      final p = decoded.payload as FramePayloadDeleteMessage;\n");
+    out.push_str("      expect(p.data.chatId, equals(1));\n");
+    out.push_str("      expect(p.data.messageId, equals(2));\n");
+    out.push_str("    });\n\n");
+
+    // Tagged enum payload frame
+    out.push_str("    test('LoadChats frame roundtrip (tagged enum payload)', () {\n");
+    out.push_str("      final payload = FramePayloadLoadChats(LoadChatsFirstPage(limit: 50));\n");
+    out.push_str("      final frame = Frame(seq: 10, eventSeq: 0, payload: payload);\n");
+    out.push_str("      final w = ProtocolWriter();\n");
+    out.push_str("      encodeFrame(w, frame);\n");
+    out.push_str("      final decoded = decodeFrame(ProtocolReader(w.toBytes()));\n");
+    out.push_str("      expect(decoded.seq, equals(10));\n");
+    out.push_str("      expect(decoded.payload, isA<FramePayloadLoadChats>());\n");
+    out.push_str("      final p = (decoded.payload as FramePayloadLoadChats).data;\n");
+    out.push_str("      expect(p, isA<LoadChatsFirstPage>());\n");
+    out.push_str("      expect((p as LoadChatsFirstPage).limit, equals(50));\n");
+    out.push_str("    });\n\n");
+
+    // Ack payload frame
+    out.push_str("    test('Ack frame roundtrip (raw bytes)', () {\n");
+    out.push_str("      final payload = FramePayloadAck(Uint8List.fromList([1, 2, 3, 4]));\n");
+    out.push_str("      final frame = Frame(seq: 20, eventSeq: 0, payload: payload);\n");
+    out.push_str("      final w = ProtocolWriter();\n");
+    out.push_str("      encodeFrame(w, frame);\n");
+    out.push_str("      final decoded = decodeFrame(ProtocolReader(w.toBytes()));\n");
+    out.push_str("      expect(decoded.seq, equals(20));\n");
+    out.push_str("      expect(decoded.payload, isA<FramePayloadAck>());\n");
+    out.push_str("      expect((decoded.payload as FramePayloadAck).data, equals(Uint8List.fromList([1, 2, 3, 4])));\n");
+    out.push_str("    });\n");
+
+    out.push_str("  });\n");
+    out.push_str("}\n");
     out
 }

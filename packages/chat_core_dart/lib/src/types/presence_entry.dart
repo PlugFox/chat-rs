@@ -13,8 +13,10 @@ class PresenceEntry {
 
   /// User ID.
   final int userId;
+
   /// Current online/offline status.
   final PresenceStatus status;
+
   /// Last seen timestamp, Unix seconds. `0` when user is currently online.
   final int lastSeen;
 
@@ -27,12 +29,9 @@ class PresenceEntry {
           lastSeen == other.lastSeen;
 
   @override
-  int get hashCode => Object.hash(
-        userId,
-        status,
-        lastSeen,
-      );
+  int get hashCode => Object.hash(userId, status, lastSeen);
 
   @override
-  String toString() => 'PresenceEntry(userId: $userId, status: $status, lastSeen: $lastSeen)';
+  String toString() =>
+      'PresenceEntry(userId: $userId, status: $status, lastSeen: $lastSeen)';
 }

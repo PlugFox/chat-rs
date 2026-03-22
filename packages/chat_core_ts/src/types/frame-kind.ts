@@ -118,59 +118,113 @@ export const enum FrameKind {
 /** Convert wire value to FrameKind, or undefined if unknown. */
 export function frameKindFromValue(value: number): FrameKind | undefined {
   switch (value) {
-    case 1: return FrameKind.Hello;
-    case 2: return FrameKind.Welcome;
-    case 3: return FrameKind.Ping;
-    case 4: return FrameKind.Pong;
-    case 5: return FrameKind.RefreshToken;
-    case 16: return FrameKind.SendMessage;
-    case 17: return FrameKind.EditMessage;
-    case 18: return FrameKind.DeleteMessage;
-    case 19: return FrameKind.ReadReceipt;
-    case 20: return FrameKind.Typing;
-    case 21: return FrameKind.GetPresence;
-    case 22: return FrameKind.LoadChats;
-    case 23: return FrameKind.Search;
-    case 24: return FrameKind.Subscribe;
-    case 25: return FrameKind.Unsubscribe;
-    case 26: return FrameKind.LoadMessages;
-    case 27: return FrameKind.AddReaction;
-    case 28: return FrameKind.RemoveReaction;
-    case 29: return FrameKind.PinMessage;
-    case 30: return FrameKind.UnpinMessage;
-    case 31: return FrameKind.ForwardMessage;
-    case 32: return FrameKind.MessageNew;
-    case 33: return FrameKind.MessageEdited;
-    case 34: return FrameKind.MessageDeleted;
-    case 35: return FrameKind.ReceiptUpdate;
-    case 36: return FrameKind.TypingUpdate;
-    case 37: return FrameKind.MemberJoined;
-    case 38: return FrameKind.MemberLeft;
-    case 39: return FrameKind.PresenceResult;
-    case 40: return FrameKind.ChatUpdated;
-    case 41: return FrameKind.ChatCreated;
-    case 42: return FrameKind.ReactionUpdate;
-    case 43: return FrameKind.UserUpdated;
-    case 44: return FrameKind.ChatDeleted;
-    case 45: return FrameKind.MemberUpdated;
-    case 48: return FrameKind.Ack;
-    case 49: return FrameKind.Error;
-    case 64: return FrameKind.CreateChat;
-    case 65: return FrameKind.UpdateChat;
-    case 66: return FrameKind.DeleteChat;
-    case 67: return FrameKind.GetChatInfo;
-    case 68: return FrameKind.GetChatMembers;
-    case 69: return FrameKind.InviteMembers;
-    case 70: return FrameKind.UpdateMember;
-    case 71: return FrameKind.LeaveChat;
-    case 72: return FrameKind.MuteChat;
-    case 73: return FrameKind.UnmuteChat;
-    case 80: return FrameKind.GetUser;
-    case 81: return FrameKind.GetUsers;
-    case 82: return FrameKind.UpdateProfile;
-    case 83: return FrameKind.BlockUser;
-    case 84: return FrameKind.UnblockUser;
-    case 85: return FrameKind.GetBlockList;
-    default: return undefined;
+    case 1:
+      return FrameKind.Hello;
+    case 2:
+      return FrameKind.Welcome;
+    case 3:
+      return FrameKind.Ping;
+    case 4:
+      return FrameKind.Pong;
+    case 5:
+      return FrameKind.RefreshToken;
+    case 16:
+      return FrameKind.SendMessage;
+    case 17:
+      return FrameKind.EditMessage;
+    case 18:
+      return FrameKind.DeleteMessage;
+    case 19:
+      return FrameKind.ReadReceipt;
+    case 20:
+      return FrameKind.Typing;
+    case 21:
+      return FrameKind.GetPresence;
+    case 22:
+      return FrameKind.LoadChats;
+    case 23:
+      return FrameKind.Search;
+    case 24:
+      return FrameKind.Subscribe;
+    case 25:
+      return FrameKind.Unsubscribe;
+    case 26:
+      return FrameKind.LoadMessages;
+    case 27:
+      return FrameKind.AddReaction;
+    case 28:
+      return FrameKind.RemoveReaction;
+    case 29:
+      return FrameKind.PinMessage;
+    case 30:
+      return FrameKind.UnpinMessage;
+    case 31:
+      return FrameKind.ForwardMessage;
+    case 32:
+      return FrameKind.MessageNew;
+    case 33:
+      return FrameKind.MessageEdited;
+    case 34:
+      return FrameKind.MessageDeleted;
+    case 35:
+      return FrameKind.ReceiptUpdate;
+    case 36:
+      return FrameKind.TypingUpdate;
+    case 37:
+      return FrameKind.MemberJoined;
+    case 38:
+      return FrameKind.MemberLeft;
+    case 39:
+      return FrameKind.PresenceResult;
+    case 40:
+      return FrameKind.ChatUpdated;
+    case 41:
+      return FrameKind.ChatCreated;
+    case 42:
+      return FrameKind.ReactionUpdate;
+    case 43:
+      return FrameKind.UserUpdated;
+    case 44:
+      return FrameKind.ChatDeleted;
+    case 45:
+      return FrameKind.MemberUpdated;
+    case 48:
+      return FrameKind.Ack;
+    case 49:
+      return FrameKind.Error;
+    case 64:
+      return FrameKind.CreateChat;
+    case 65:
+      return FrameKind.UpdateChat;
+    case 66:
+      return FrameKind.DeleteChat;
+    case 67:
+      return FrameKind.GetChatInfo;
+    case 68:
+      return FrameKind.GetChatMembers;
+    case 69:
+      return FrameKind.InviteMembers;
+    case 70:
+      return FrameKind.UpdateMember;
+    case 71:
+      return FrameKind.LeaveChat;
+    case 72:
+      return FrameKind.MuteChat;
+    case 73:
+      return FrameKind.UnmuteChat;
+    case 80:
+      return FrameKind.GetUser;
+    case 81:
+      return FrameKind.GetUsers;
+    case 82:
+      return FrameKind.UpdateProfile;
+    case 83:
+      return FrameKind.BlockUser;
+    case 84:
+      return FrameKind.UnblockUser;
+    case 85:
+      return FrameKind.GetBlockList;
+    default:
+      return undefined;
   }
 }

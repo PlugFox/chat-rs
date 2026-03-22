@@ -11,8 +11,10 @@ class ReceiptUpdatePayload {
 
   /// Chat where the receipt update occurred.
   final int chatId;
+
   /// User who read the messages.
   final int userId;
+
   /// Highest read message ID.
   final int messageId;
 
@@ -25,12 +27,9 @@ class ReceiptUpdatePayload {
           messageId == other.messageId;
 
   @override
-  int get hashCode => Object.hash(
-        chatId,
-        userId,
-        messageId,
-      );
+  int get hashCode => Object.hash(chatId, userId, messageId);
 
   @override
-  String toString() => 'ReceiptUpdatePayload(chatId: $chatId, userId: $userId, messageId: $messageId)';
+  String toString() =>
+      'ReceiptUpdatePayload(chatId: $chatId, userId: $userId, messageId: $messageId)';
 }

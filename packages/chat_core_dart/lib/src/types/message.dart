@@ -28,25 +28,35 @@ class Message {
 
   /// Sequential per-chat ID (starts at 1).
   final int id;
+
   /// Chat this message belongs to.
   final int chatId;
+
   /// Internal user ID of the sender.
   final int senderId;
+
   /// Creation timestamp, Unix seconds.
   final int createdAt;
+
   /// Last modification timestamp, Unix seconds.
   final int updatedAt;
+
   /// Content type.
   final MessageKind kind;
+
   /// Bitfield of message properties.
   final MessageFlags flags;
+
   /// Message this is replying to. `None` = not a reply.
   /// When set, `MessageFlags::REPLY` is also set.
   final int? replyToId;
+
   /// Plain text content; empty string for deleted tombstones.
   final String content;
+
   /// Rich content spans. `None` = no formatting.
   final List<RichSpan>? richContent;
+
   /// Extra metadata JSON. `None` = no metadata.
   final String? extra;
 
@@ -68,19 +78,20 @@ class Message {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        chatId,
-        senderId,
-        createdAt,
-        updatedAt,
-        kind,
-        flags,
-        replyToId,
-        content,
-        Object.hashAll(richContent ?? const []),
-        extra,
-      );
+    id,
+    chatId,
+    senderId,
+    createdAt,
+    updatedAt,
+    kind,
+    flags,
+    replyToId,
+    content,
+    Object.hashAll(richContent ?? const []),
+    extra,
+  );
 
   @override
-  String toString() => 'Message(id: $id, chatId: $chatId, senderId: $senderId, createdAt: $createdAt, updatedAt: $updatedAt, kind: $kind, flags: $flags, replyToId: $replyToId, content: $content, richContent: $richContent, extra: $extra)';
+  String toString() =>
+      'Message(id: $id, chatId: $chatId, senderId: $senderId, createdAt: $createdAt, updatedAt: $updatedAt, kind: $kind, flags: $flags, replyToId: $replyToId, content: $content, richContent: $richContent, extra: $extra)';
 }

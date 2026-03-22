@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { ErrorCode } from './error-code.js';
+import type { ErrorCode } from "./error-code.js";
 
 /** Error frame payload (server → client). */
 export interface ErrorPayload {

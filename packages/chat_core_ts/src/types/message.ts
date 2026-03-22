@@ -1,9 +1,9 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import type { MessageFlags } from './message-flags.js';
-import type { MessageKind } from './message-kind.js';
-import type { RichSpan } from './rich-span.js';
+import type { MessageFlags } from "./message-flags.js";
+import type { MessageKind } from "./message-kind.js";
+import type { RichSpan } from "./rich-span.js";
 
 /**
  * A decoded message (as transmitted in `MessageBatch`).

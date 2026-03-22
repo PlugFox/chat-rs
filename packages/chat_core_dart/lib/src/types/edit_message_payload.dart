@@ -17,12 +17,16 @@ class EditMessagePayload {
 
   /// Target chat.
   final int chatId;
+
   /// Message to edit.
   final int messageId;
+
   /// New plain-text content.
   final String content;
+
   /// New rich content spans. `None` = remove formatting.
   final Uint8List? richContent;
+
   /// New extra metadata JSON. `None` = remove metadata.
   final String? extra;
 
@@ -38,13 +42,14 @@ class EditMessagePayload {
 
   @override
   int get hashCode => Object.hash(
-        chatId,
-        messageId,
-        content,
-        Object.hashAll(richContent ?? const []),
-        extra,
-      );
+    chatId,
+    messageId,
+    content,
+    Object.hashAll(richContent ?? const []),
+    extra,
+  );
 
   @override
-  String toString() => 'EditMessagePayload(chatId: $chatId, messageId: $messageId, content: $content, richContent: $richContent, extra: $extra)';
+  String toString() =>
+      'EditMessagePayload(chatId: $chatId, messageId: $messageId, content: $content, richContent: $richContent, extra: $extra)';
 }

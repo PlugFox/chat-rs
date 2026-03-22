@@ -5,8 +5,10 @@
 extension type const UserFlags(int value) implements int {
   /// System account (server-generated messages).
   static const UserFlags system = UserFlags(0x0001);
+
   /// Bot account; server sets `MessageFlags::BOT` on all messages.
   static const UserFlags bot = UserFlags(0x0002);
+
   /// Premium subscriber; clients may show a badge.
   static const UserFlags premium = UserFlags(0x0004);
 

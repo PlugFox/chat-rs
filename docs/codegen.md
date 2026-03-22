@@ -4,17 +4,17 @@
 
 ## Decisions Log
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| UUID representation | `String` (hex with dashes) | Easier debugging, JSON compat; codec converts to/from 16 bytes |
-| Dart bitflags | `extension type` on `int` | Zero-cost, operator support, per user's existing pattern |
-| TS bitflags | `const enum` + helper object | Tree-shakeable, numeric at runtime |
-| Dart naming | Standard (`ChatKind`, `MessageFlags`) | No `$` prefix |
-| TS target | ES2022, with `tsconfig.json` and build step | Must produce `.js` + `.d.ts` for Dart `js_interop` |
-| Timestamps | `number` in TS, `int` in Dart | Unix seconds < 2^41, safe in JS Number |
-| Codegen tool | `cargo xtask codegen` using `syn` | All automation via xtask per project rules |
-| Tests | Standalone per-language first, cross-language fixtures later |
-| AckPayload codec | Not generated — hand-written client logic | Context-dependent decoding |
+| Decision            | Choice                                                       | Rationale                                                      |
+| ------------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |
+| UUID representation | `String` (hex with dashes)                                   | Easier debugging, JSON compat; codec converts to/from 16 bytes |
+| Dart bitflags       | `extension type` on `int`                                    | Zero-cost, operator support, per user's existing pattern       |
+| TS bitflags         | `const enum` + helper object                                 | Tree-shakeable, numeric at runtime                             |
+| Dart naming         | Standard (`ChatKind`, `MessageFlags`)                        | No `$` prefix                                                  |
+| TS target           | ES2022, with `tsconfig.json` and build step                  | Must produce `.js` + `.d.ts` for Dart `js_interop`             |
+| Timestamps          | `number` in TS, `int` in Dart                                | Unix seconds < 2^41, safe in JS Number                         |
+| Codegen tool        | `cargo xtask codegen` using `syn`                            | All automation via xtask per project rules                     |
+| Tests               | Standalone per-language first, cross-language fixtures later |
+| AckPayload codec    | Not generated — hand-written client logic                    | Context-dependent decoding                                     |
 
 ---
 
@@ -404,24 +404,24 @@ class ChatEntry {
 **Field naming:** Rust `snake_case` → Dart `camelCase`.
 
 **Type mapping:**
-| Rust | Dart |
-|------|------|
-| `u8`, `u16`, `u32` | `int` |
-| `i64` | `int` |
-| `bool` | `bool` |
-| `String` | `String` |
-| `Option<String>` | `String?` |
-| `Option<u32>` | `int?` |
-| `Uuid` | `String` |
-| `Vec<u32>` | `List<int>` |
-| `Vec<u8>` | `Uint8List` |
-| `Option<Vec<u8>>` | `Uint8List?` |
-| `Vec<String>` | `List<String>` |
-| Enum reference | Enum type |
+| Rust               | Dart           |
+| ------------------ | -------------- |
+| `u8`, `u16`, `u32` | `int`          |
+| `i64`              | `int`          |
+| `bool`             | `bool`         |
+| `String`           | `String`       |
+| `Option<String>`   | `String?`      |
+| `Option<u32>`      | `int?`         |
+| `Uuid`             | `String`       |
+| `Vec<u32>`         | `List<int>`    |
+| `Vec<u8>`          | `Uint8List`    |
+| `Option<Vec<u8>>`  | `Uint8List?`   |
+| `Vec<String>`      | `List<String>` |
+| Enum reference     | Enum type      |
 | Bitflags reference | Extension type |
-| Struct reference | Class type |
-| `Option<Struct>` | `Class?` |
-| `Vec<Struct>` | `List<Class>` |
+| Struct reference   | Class type     |
+| `Option<Struct>`   | `Class?`       |
+| `Vec<Struct>`      | `List<Class>`  |
 
 **Target structs (~30):**
 All payload structs from `frame.rs` + entity structs from `chat.rs`, `message.rs`, `user.rs`, `error.rs`.
@@ -595,19 +595,19 @@ export interface ChatEntry {
 ```
 
 **Type mapping:**
-| Rust | TypeScript |
-|------|-----------|
-| `u8`, `u16`, `u32`, `i64` | `number` |
-| `bool` | `boolean` |
-| `String` | `string` |
-| `Option<String>` | `string \| null` |
-| `Option<u32>` | `number \| null` |
-| `Uuid` | `string` |
-| `Vec<u32>` | `readonly number[]` |
-| `Vec<u8>` | `Uint8Array` |
-| `Option<Vec<u8>>` | `Uint8Array \| null` |
-| `Vec<String>` | `readonly string[]` |
-| Enum/Bitflags/Struct | named type |
+| Rust                      | TypeScript           |
+| ------------------------- | -------------------- |
+| `u8`, `u16`, `u32`, `i64` | `number`             |
+| `bool`                    | `boolean`            |
+| `String`                  | `string`             |
+| `Option<String>`          | `string \| null`     |
+| `Option<u32>`             | `number \| null`     |
+| `Uuid`                    | `string`             |
+| `Vec<u32>`                | `readonly number[]`  |
+| `Vec<u8>`                 | `Uint8Array`         |
+| `Option<Vec<u8>>`         | `Uint8Array \| null` |
+| `Vec<String>`             | `readonly string[]`  |
+| Enum/Bitflags/Struct      | named type           |
 
 **Acceptance criteria:**
 - All interfaces generated
@@ -730,26 +730,26 @@ ChatEntry decodeChatEntry(ProtocolReader r) {
 
 **Wire format encoding rules (derived from Rust codec):**
 
-| FieldType | Encode | Decode |
-|-----------|--------|--------|
-| `U8` | `writeU8` | `readU8` |
-| `U16` | `writeU16` | `readU16` |
-| `U32` | `writeU32` | `readU32` |
-| `I64` | `writeI64` | `readI64` |
-| `Bool` | `writeU8(v ? 1 : 0)` | `readU8() != 0` |
-| `String` | `writeString` | `readString` |
-| `OptionalString` | `writeOptionalString` | `readOptionalString` |
-| `UpdatableString` | `writeU8(flag) + writeString` | `readU8 → readString` |
-| `Uuid` | `writeUuid` | `readUuid` |
-| `OptionalU32` | `writeOptionU32` | `readOptionU32` |
-| `VecU32` | `writeU16(len) + writeU32[]` | `readU16 → readU32[]` |
-| `OptionalBytes` | `writeOptionalBytes` | `readOptionalBytes` |
-| `VecString` | `writeU16(len) + writeString[]` | `readU16 → readString[]` |
-| `Enum(name)` | `writeU8(v.value)` | `Enum.fromValue(readU8())` |
-| `Bitflags(name)` | `writeU16/U32(v.value)` | `Type(readU16/U32())` |
-| `Struct(name)` | `encodeX(w, v)` | `decodeX(r)` |
-| `OptionalStruct(name)` | `writeU8(flag) + encodeX` | `readU8 → decodeX` |
-| `VecStruct(name)` | `writeU32(len) + encodeX[]` | `readU32 → decodeX[]` |
+| FieldType              | Encode                          | Decode                     |
+| ---------------------- | ------------------------------- | -------------------------- |
+| `U8`                   | `writeU8`                       | `readU8`                   |
+| `U16`                  | `writeU16`                      | `readU16`                  |
+| `U32`                  | `writeU32`                      | `readU32`                  |
+| `I64`                  | `writeI64`                      | `readI64`                  |
+| `Bool`                 | `writeU8(v ? 1 : 0)`            | `readU8() != 0`            |
+| `String`               | `writeString`                   | `readString`               |
+| `OptionalString`       | `writeOptionalString`           | `readOptionalString`       |
+| `UpdatableString`      | `writeU8(flag) + writeString`   | `readU8 → readString`      |
+| `Uuid`                 | `writeUuid`                     | `readUuid`                 |
+| `OptionalU32`          | `writeOptionU32`                | `readOptionU32`            |
+| `VecU32`               | `writeU16(len) + writeU32[]`    | `readU16 → readU32[]`      |
+| `OptionalBytes`        | `writeOptionalBytes`            | `readOptionalBytes`        |
+| `VecString`            | `writeU16(len) + writeString[]` | `readU16 → readString[]`   |
+| `Enum(name)`           | `writeU8(v.value)`              | `Enum.fromValue(readU8())` |
+| `Bitflags(name)`       | `writeU16/U32(v.value)`         | `Type(readU16/U32())`      |
+| `Struct(name)`         | `encodeX(w, v)`                 | `decodeX(r)`               |
+| `OptionalStruct(name)` | `writeU8(flag) + encodeX`       | `readU8 → decodeX`         |
+| `VecStruct(name)`      | `writeU32(len) + encodeX[]`     | `readU32 → decodeX[]`      |
 
 **Special cases:**
 - `ErrorPayload.code` — encoded as `u16`, plus slug as `u8 len + UTF-8` (not standard string)
@@ -885,40 +885,40 @@ Phases 2 and 3 can be done in parallel since they read the same IR and output to
 
 ### Dart (`packages/chat_core_dart/lib/src/`)
 
-| File | Source |
-|------|--------|
-| `types/chat_kind.dart` | `ChatKind` enum |
-| `types/chat_role.dart` | `ChatRole` enum |
-| `types/message_kind.dart` | `MessageKind` enum |
-| `types/presence_status.dart` | `PresenceStatus` enum |
-| `types/load_direction.dart` | `LoadDirection` enum |
-| `types/frame_kind.dart` | `FrameKind` enum |
-| `types/error_code.dart` | `ErrorCode` enum |
-| `types/disconnect_code.dart` | `DisconnectCode` enum |
-| `types/permission.dart` | `Permission` bitflags |
-| `types/user_flags.dart` | `UserFlags` bitflags |
-| `types/message_flags.dart` | `MessageFlags` bitflags |
-| `types/rich_style.dart` | `RichStyle` bitflags |
-| `types/server_capabilities.dart` | `ServerCapabilities` bitflags |
-| `types/chat_entry.dart` | `ChatEntry` + `LastMessagePreview` |
-| `types/chat_member_entry.dart` | `ChatMemberEntry` |
-| `types/user_entry.dart` | `UserEntry` |
-| `types/presence_entry.dart` | `PresenceEntry` |
-| `types/message.dart` | `Message`, `MessageBatch`, `RichSpan` |
-| `types/error_payload.dart` | `ErrorPayload` |
-| `types/frame_header.dart` | `FrameHeader` |
-| `types/server_limits.dart` | `ServerLimits` |
-| `types/*_payload.dart` | ~25 payload struct files |
-| `types/load_chats_payload.dart` | sealed class |
-| `types/load_messages_payload.dart` | sealed class |
-| `types/search_scope.dart` | sealed class |
-| `types/member_action.dart` | sealed class |
-| `types/ack_payload.dart` | sealed class (types only) |
-| `codec/reader.dart` | Hand-written reader |
-| `codec/writer.dart` | Hand-written writer |
-| `codec/codec.dart` | Generated encode/decode functions |
-| `protocol_constants.dart` | Constants |
-| **Barrel:** `lib/chat_core.dart` | All exports |
+| File                               | Source                                |
+| ---------------------------------- | ------------------------------------- |
+| `types/chat_kind.dart`             | `ChatKind` enum                       |
+| `types/chat_role.dart`             | `ChatRole` enum                       |
+| `types/message_kind.dart`          | `MessageKind` enum                    |
+| `types/presence_status.dart`       | `PresenceStatus` enum                 |
+| `types/load_direction.dart`        | `LoadDirection` enum                  |
+| `types/frame_kind.dart`            | `FrameKind` enum                      |
+| `types/error_code.dart`            | `ErrorCode` enum                      |
+| `types/disconnect_code.dart`       | `DisconnectCode` enum                 |
+| `types/permission.dart`            | `Permission` bitflags                 |
+| `types/user_flags.dart`            | `UserFlags` bitflags                  |
+| `types/message_flags.dart`         | `MessageFlags` bitflags               |
+| `types/rich_style.dart`            | `RichStyle` bitflags                  |
+| `types/server_capabilities.dart`   | `ServerCapabilities` bitflags         |
+| `types/chat_entry.dart`            | `ChatEntry` + `LastMessagePreview`    |
+| `types/chat_member_entry.dart`     | `ChatMemberEntry`                     |
+| `types/user_entry.dart`            | `UserEntry`                           |
+| `types/presence_entry.dart`        | `PresenceEntry`                       |
+| `types/message.dart`               | `Message`, `MessageBatch`, `RichSpan` |
+| `types/error_payload.dart`         | `ErrorPayload`                        |
+| `types/frame_header.dart`          | `FrameHeader`                         |
+| `types/server_limits.dart`         | `ServerLimits`                        |
+| `types/*_payload.dart`             | ~25 payload struct files              |
+| `types/load_chats_payload.dart`    | sealed class                          |
+| `types/load_messages_payload.dart` | sealed class                          |
+| `types/search_scope.dart`          | sealed class                          |
+| `types/member_action.dart`         | sealed class                          |
+| `types/ack_payload.dart`           | sealed class (types only)             |
+| `codec/reader.dart`                | Hand-written reader                   |
+| `codec/writer.dart`                | Hand-written writer                   |
+| `codec/codec.dart`                 | Generated encode/decode functions     |
+| `protocol_constants.dart`          | Constants                             |
+| **Barrel:** `lib/chat_core.dart`   | All exports                           |
 
 ### TypeScript (`packages/chat_core_ts/src/`)
 

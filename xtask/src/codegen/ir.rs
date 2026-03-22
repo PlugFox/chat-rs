@@ -133,6 +133,10 @@ pub(crate) enum FieldType {
     Struct(std::string::String),
     /// `Option<struct>` — wire: u8 flag + struct.
     OptionalStruct(std::string::String),
+    /// `Option<bitflags>` — wire: u8 flag + repr value.
+    OptionalBitflags(std::string::String),
+    /// `Option<Vec<struct>>` — wire: u8 flag + count + structs (or count=0 for None).
+    OptionalVecStruct(std::string::String),
     /// `Vec<struct>` — wire: count + structs.
     VecStruct(std::string::String),
     /// Inline tagged enum (e.g. MemberAction).

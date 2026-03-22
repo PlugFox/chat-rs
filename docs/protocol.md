@@ -42,20 +42,20 @@ All WS binary frames share a 5-byte header:
 | Unsubscribe   | 0x19  | —       | no        |
 | LoadMessages  | 0x1A  | —       | rpc       |
 
-### Events (0x20..0x29, server → client)
+### Events (0x20..0x28, server → client)
 
-| Kind           | Value | Purpose                                             |
-| -------------- | ----- | --------------------------------------------------- |
-| MessageNew     | 0x20  | New message delivered in real-time                  |
-| MessageEdited  | 0x21  | Message content changed                             |
-| MessageDeleted | 0x22  | Message marked deleted (content cleared, row kept)  |
-| ReceiptUpdate  | 0x23  | Read receipt update                                 |
-| TypingUpdate   | 0x24  | Typing indicator                                    |
-| MemberJoined   | 0x25  | Member joined chat                                  |
-| MemberLeft     | 0x26  | Member left chat                                    |
-| PresenceResult | 0x27  | Response to GetPresence                             |
-| ChatUpdated    | 0x28  | Chat metadata changed (title, avatar, last message) |
-| ChatCreated    | 0x29  | New chat the user is a member of                    |
+| Kind           | Value | Purpose                                            |
+| -------------- | ----- | -------------------------------------------------- |
+| MessageNew     | 0x20  | New message delivered in real-time                 |
+| MessageEdited  | 0x21  | Message content changed                            |
+| MessageDeleted | 0x22  | Message marked deleted (content cleared, row kept) |
+| ReceiptUpdate  | 0x23  | Read receipt update                                |
+| TypingUpdate   | 0x24  | Typing indicator                                   |
+| MemberJoined   | 0x25  | Member joined chat                                 |
+| MemberLeft     | 0x26  | Member left chat                                   |
+| PresenceResult | 0x27  | Response to GetPresence                            |
+| ChatUpdated    | 0x28  | Chat metadata changed (title, avatar)              |
+| ChatCreated    | 0x29  | New chat the user is a member of                   |
 
 ### Responses (0x30..0x31)
 
@@ -64,21 +64,35 @@ All WS binary frames share a 5-byte header:
 | Ack   | 0x30  | Command acknowledged |
 | Error | 0x31  | Error response       |
 
-### Chat Management (0x40..0x4A, client → server, RPC)
+### Chat Management (0x40..0x47, client → server, RPC)
 
-| Kind             | Value | Purpose            |
-| ---------------- | ----- | ------------------ |
-| CreateChat       | 0x40  | Create a new chat  |
-| UpdateChat       | 0x41  | Update chat info   |
-| DeleteChat       | 0x42  | Delete chat        |
-| GetChatInfo      | 0x43  | Get chat details   |
-| GetChatMembers   | 0x44  | List chat members  |
-| InviteMembers    | 0x45  | Invite users       |
-| KickMember       | 0x46  | Remove member      |
-| LeaveChat        | 0x47  | Leave chat         |
-| UpdateMemberRole | 0x48  | Change member role |
-| MuteMember       | 0x49  | Mute member        |
-| BanMember        | 0x4A  | Ban member         |
+| Kind           | Value | Purpose                                          |
+| -------------- | ----- | ------------------------------------------------ |
+| CreateChat     | 0x40  | Create a new chat                                |
+| UpdateChat     | 0x41  | Update chat info (title, avatar)                 |
+| DeleteChat     | 0x42  | Delete chat                                      |
+| GetChatInfo    | 0x43  | Get chat details                                 |
+| GetChatMembers | 0x44  | List chat members                                |
+| InviteMembers  | 0x45  | Invite users                                     |
+| UpdateMember   | 0x46  | Kick, ban, mute, change role/permissions         |
+| LeaveChat      | 0x47  | Leave chat                                       |
+
+`UpdateMember` replaces the previous separate `KickMember`, `BanMember`, `MuteMember`,
+and `UpdateMemberRole` frames. The action is determined by an `action: u8` discriminant:
+
+```
+chat_id: u32 | user_id: u32 | action: u8 | action-specific payload
+```
+
+| Action | Value | Payload             | Description                    |
+| ------ | ----- | ------------------- | ------------------------------ |
+| Kick   | 0     | (none)              | Remove member from chat        |
+| Ban    | 1     | (none)              | Ban member from chat           |
+| Mute   | 2     | `duration_secs: u32`| Mute (0 = unmute)              |
+| ChangeRole | 3 | `role: u8`          | Change member's role           |
+| UpdatePermissions | 4 | `permissions: u32` | Set permission override    |
+
+Response: `Ack` (empty).
 
 ## Handshake
 
@@ -113,6 +127,14 @@ Bitflags `u32` sent in Welcome. Client uses these to show/hide features.
 | `BOTS`         | 0x10 | Bot API enabled                  |
 
 ## Key Frame Payloads
+
+### Event Payloads (server → client)
+
+**MessageNew (0x20)**: payload is a single `Message` (same wire format as in `MessageBatch`).
+
+**MessageEdited (0x21)**: payload is a single `Message` with updated content/rich/extra and `EDITED` flag set.
+
+**MessageDeleted (0x22)**: `chat_id: u32`, `message_id: u32`. Content is already cleared server-side.
 
 ### Subscribe (0x18)
 
@@ -167,6 +189,9 @@ after a successful Mode 1 response. On reconnect the set is cleared.
 
 `cursor_ts: i64` (0 = first page), `limit: u16`
 
+`cursor_ts = 0` is a sentinel meaning "no cursor / first page". It is technically a valid
+timestamp (1970-01-01) but no real chat will have `updated_at = 0`, so there is no ambiguity.
+
 Response: `Ack` with payload: `next_cursor_ts: i64`, then `count: u32` + chat entries.
 
 ### GetPresence (0x15)
@@ -180,6 +205,14 @@ Response: `PresenceResult (0x27)` frame with the same seq.
 `chat_id: u32`, `query: String`, `cursor: u32` (0 = first page), `limit: u16`
 
 Response: `Ack` with payload: `next_cursor: u32`, then `count: u32` + `(message_id: u32, snippet_len: u32, snippet: UTF-8)` entries.
+
+### UpdateChat (0x41)
+
+`chat_id: u32`, `title: String`, `avatar_url: String`
+
+**Clear semantics**: an empty string (`len = 0`) means "clear this field" (set to NULL).
+To leave a field unchanged, omit the update (send the current value). This avoids the
+need for a separate "clear" flag.
 
 ## Versioning
 

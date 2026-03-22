@@ -13,8 +13,8 @@
 | `id`         | `u32`             | `u32`                   | Sequential per-chat ID; scoped to `chat_id`, starts at 1 |
 | `chat_id`    | `u32`             | `u32`                   | Chat this message belongs to                             |
 | `sender_id`  | `u32`             | `u32`                   | Internal user ID of the sender                           |
-| `created_at` | `i64`             | `i64`                   | Creation timestamp, Unix seconds                         |
-| `updated_at` | `i64`             | `i64`                   | Last modification timestamp, Unix seconds;               |
+| `created_at` | `i64`             | `i64`                   | Creation timestamp, Unix seconds (validated: 0 ≤ v < 2⁴¹)|
+| `updated_at` | `i64`             | `i64`                   | Last modification timestamp, Unix seconds (validated)    |
 | `kind`       | `u8`              | `MessageKind`           | Content type                                             |
 | `flags`      | `u16`             | `MessageFlags`          | Bitfield of message properties                           |
 | `content`    | `u32 len + UTF-8` | `String`                | Plain text; empty string for deleted tombstones          |
@@ -114,6 +114,8 @@ Followed by variable-length tail (each section absent when its `len = 0`):
 
 `len = 0` means the field is absent — no bytes follow and no allocation is made.
 
+Timestamps are validated against codec range (see [codec.md](codec.md#timestamp-validation)).
+
 ### Rich Content Blob
 
 ```
@@ -122,39 +124,59 @@ Followed by variable-length tail (each section absent when its `len = 0`):
 └───────────┴───────────────────┘
 
 Span — 10 bytes fixed + optional meta:
-┌────────────┬──────────┬───────────┬──────────────────┐
-│ start: u32 │ end: u32 │ style: u16│ meta (if present)│
-└────────────┴──────────┴───────────┴──────────────────┘
+┌────────────┬──────────┬───────────┬──────────────────────────────┐
+│ start: u32 │ end: u32 │ style: u16│ meta_len: u32 + JSON (UTF-8) │
+└────────────┴──────────┴───────────┴──────────────────────────────┘
 ```
 
 `start`/`end` are byte offsets into the plain-text `content` string.
 
-Meta is appended when specific `style` bits are set:
+`meta_len = 0` — no meta for this span (14 bytes total: 10 fixed + 4 for meta_len).
 
-| Flag      | Meta                       |
-| --------- | -------------------------- |
-| `LINK`    | `url_len: u32` + UTF-8 URL |
-| `MENTION` | `user_id: u32`             |
+When `meta_len > 0`, meta is a JSON object. Keys depend on the `style` bits set:
+
+| Style bit    | Meta JSON key           | Example                          |
+| ------------ | ----------------------- | -------------------------------- |
+| `LINK`       | `"url": String`         | `{"url": "https://example.com"}` |
+| `MENTION`    | `"user_id": u32`        | `{"user_id": 42}`                |
+| `COLOR`      | `"rgba": u32`           | `{"rgba": 4278190335}`           |
+| `CODE_BLOCK` | `"lang": String`        | `{"lang": "rust"}`               |
+
+Multiple keys may be present when multiple style bits with meta are combined.
+Unknown keys must be tolerated (forward compatibility).
 
 ### RichStyle flags
 
 ```rust
 bitflags! {
     pub struct RichStyle: u16 {
-        const BOLD    = 0x0001;
-        const ITALIC  = 0x0002;
-        const CODE    = 0x0004; // inline code span
-        const STRIKE  = 0x0008;
-        const SPOILER = 0x0010;
-        const LINK    = 0x0020; // meta: url_len + URL
-        const MENTION = 0x0040; // meta: user_id: u32
-        const COLOR   = 0x0080;
-        // 0x0100+: reserved
+        // Inline styles (combinable)
+        const BOLD       = 0x0001;
+        const ITALIC     = 0x0002;
+        const UNDERLINE  = 0x0004;
+        const STRIKE     = 0x0008;
+        const SPOILER    = 0x0010;
+        const CODE       = 0x0020; // inline monospace `code`
+
+        // Styles with meta (combinable with inline)
+        const LINK       = 0x0040; // meta: {"url": "..."}
+        const MENTION    = 0x0080; // meta: {"user_id": u32}
+        const COLOR      = 0x0100; // meta: {"rgba": u32}
+
+        // Block-level (exclusive — overrides inline styles on this span)
+        const CODE_BLOCK = 0x0200; // meta: {"lang": "rust"}, see below
+        const BLOCKQUOTE = 0x0400; // > quoted text
+
+        // 0x0800–0x8000: reserved
     }
 }
 ```
 
-Multiple style bits may be combined on a single span (e.g. bold + italic).
+Multiple style bits may be combined on a single span (e.g. bold + italic + link).
+
+**Block-level semantics:** When `CODE_BLOCK` is set, the client ignores inline style
+bits (BOLD, ITALIC, etc.) on this span — code blocks render as-is. `BLOCKQUOTE` may
+contain nested inline-styled spans at different offsets within the quoted range.
 
 ## Extra JSON
 
@@ -223,12 +245,6 @@ updated_at TIMESTAMPTZ  NOT NULL,
 PRIMARY KEY (chat_id, id)
 ```
 
-`chats` table carries the per-chat ID counter:
-
-```sql
-last_msg_id  INTEGER  NOT NULL DEFAULT 0
-```
-
 ### SQLite (client — `chat_client_rs` repo)
 
 The client never generates message IDs — all IDs arrive from the server.
@@ -247,9 +263,6 @@ reply_to_id  INTEGER,        -- planned (threads milestone)
 updated_at   INTEGER NOT NULL,
 PRIMARY KEY (chat_id, id)
 ```
-
-`last_message_id` in the `chats` table doubles as the sync cursor:
-`WHERE chat_id = ? AND id > last_message_id` fetches all unseen messages after reconnect.
 
 ### Flags and permissions storage
 

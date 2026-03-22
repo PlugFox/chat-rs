@@ -12,6 +12,26 @@ All values are little-endian (native for ARM/x86).
 
 Total header: 5 bytes.
 
+## Timestamp Validation
+
+All `i64` timestamp fields carry Unix seconds. The codec **rejects** (returns `CodecError`)
+any timestamp outside the valid range on both encode and decode:
+
+```
+MIN_TIMESTAMP = 0                    (1970-01-01 00:00:00 UTC)
+MAX_TIMESTAMP = (1 << 41) - 1        (2_199_023_255_551 — year ~71,700)
+```
+
+Fast check: `value >> 41 != 0` → reject. Single shift + test — the cheapest possible
+bounds check.
+
+Why this range:
+- Catches "milliseconds instead of seconds" bugs (2024 in ms ≈ 1.7 × 10¹², > 2⁴¹)
+- Guaranteed safe in JavaScript `Number` (max safe = 2⁵³ − 1)
+- Negative values rejected (no use case before 1970)
+- On violation: return `CodecError::TimestampOutOfRange`, never clamp silently — silent
+  clamp hides bugs
+
 ## Error Frame Payload
 
 Payload of an `Error (0x31)` frame (header `seq` identifies which request failed):
@@ -51,7 +71,7 @@ Signals that the server rejected or failed to process a command. The `seq` in th
 
 ## Message Batch Format
 
-Used in `SyncBatch (0x27)` and as response to `LoadMessages (0x1A)` and `Subscribe (0x18)`.
+Used as response to `LoadMessages (0x1A)` and as payload of `MessageNew (0x20)` events.
 
 ```
 MessageBatch:
@@ -68,6 +88,8 @@ Message (fixed header 35 bytes + variable):
 
 Followed by: `rich_len: u32` + rich blob, `extra_len: u32` + extra JSON bytes. If len = 0, no data and no allocation.
 
+Timestamps (`created_at`, `updated_at`) are validated against the range defined above.
+
 ## Rich Content BLOB
 
 ```
@@ -76,27 +98,42 @@ Followed by: `rich_len: u32` + rich blob, `extra_len: u32` + extra JSON bytes. I
 └───────────┴──────────────────────┘
 
 Span (10 bytes fixed + optional meta):
-┌────────────┬──────────┬──────────┬──────────────────────┐
-│ start: u32 │ end: u32 │ style:u16│ meta (if present)    │
-└────────────┴──────────┴──────────┴──────────────────────┘
+┌────────────┬──────────┬──────────┬──────────────────────────────┐
+│ start: u32 │ end: u32 │ style:u16│ meta_len: u32 + JSON (UTF-8) │
+└────────────┴──────────┴──────────┴──────────────────────────────┘
 ```
 
 `start/end` are byte offsets into the plain text string.
 
-`meta` is present when `style` has `LINK`, `MENTION`, or `CODE_BLOCK` bits set:
-- `LINK`: `url_len: u32` + UTF-8 URL
-- `MENTION`: `user_id: u32`
-- `CODE_BLOCK`: `lang_len: u8` + UTF-8 language tag (e.g. `rust`)
+`meta_len = 0` means no meta for this span (most spans: bold, italic, etc. — 14 bytes total).
 
-## Server-Side Batching
+When `meta_len > 0`, meta is a JSON object whose keys depend on the `style` bits set:
 
-The server accumulates up to 20 events or 16 ms (whichever comes first) into a single `SyncBatch` frame. This reduces per-frame overhead during burst delivery. Clients must be prepared to receive multiple messages in a single WS frame.
+| Style bit    | Meta JSON key           | Example                         |
+| ------------ | ----------------------- | ------------------------------- |
+| `LINK`       | `"url": String`         | `{"url": "https://example.com"}`|
+| `MENTION`    | `"user_id": u32`        | `{"user_id": 42}`               |
+| `COLOR`      | `"rgba": u32`           | `{"rgba": 4278190335}`          |
+| `CODE_BLOCK` | `"lang": String`        | `{"lang": "rust"}`              |
+
+Multiple keys may be present in one meta object when multiple style bits with meta are
+combined on a single span. Unknown keys must be tolerated (forward compatibility).
+
+## String Encoding Convention
+
+- `read_string()` / `write_string()` — length-prefixed UTF-8. Returns `""` when `len = 0`.
+  Used for fields that are always present (e.g. `content` — empty string for deleted messages).
+- `read_optional_string()` / `write_optional_string()` — same encoding, but returns `None`
+  when `len = 0`. Used for fields that can be absent (e.g. `extra`, `title`, `avatar_url`).
+
+Consequence: `Some("")` and `None` are indistinguishable on the wire — both encode as `len = 0`.
+This is by design; empty optional strings have no semantic meaning.
 
 ## Type Mapping
 
 | Rust                | Wire                 | Size          |
 | ------------------- | -------------------- | ------------- |
-| `i64`               | 8 bytes LE           | 8             | <!-- timestamps only (Unix seconds) --> |
+| `i64`               | 8 bytes LE           | 8             | <!-- timestamps only (Unix seconds), validated: 0 ≤ v < 2⁴¹ --> |
 | `u32`               | 4 bytes LE           | 4             | <!-- IDs, lengths, counts -->           |
 | `i32`               | 4 bytes LE           | 4             | <!-- signed counters -->                |
 | `u16`               | 2 bytes LE           | 2             |

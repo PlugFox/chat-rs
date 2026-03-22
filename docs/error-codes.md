@@ -75,6 +75,22 @@ See `DisconnectCode` in `chat_protocol::types`.
 | 3002 | `DuplicateSession`   | Yes       | Same device_id connected from another location |
 | 3003 | `ServerError`        | Yes       | Unrecoverable internal server error            |
 | 3004 | `BufferOverflow`     | Yes       | Client send buffer exceeded capacity           |
+| 3005 | `RateLimited`        | Yes       | Too many requests on this connection, backoff  |
 | 3500 | `TokenInvalid`       | No        | Token is malformed or has invalid signature    |
 | 3501 | `Banned`             | No        | User is banned                                 |
 | 3502 | `UnsupportedVersion` | No        | Protocol version not supported by server       |
+| 3503 | `ConnectionLimit`    | No        | Max connections per IP/user exceeded            |
+
+### should_reconnect logic
+
+```rust
+impl DisconnectCode {
+    pub fn should_reconnect(&self) -> bool {
+        let code = *self as u16;
+        match code {
+            0..1000 | 3000..3500 | 4000..4500 => true,
+            _ => false,
+        }
+    }
+}
+```

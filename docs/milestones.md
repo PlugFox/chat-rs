@@ -28,19 +28,8 @@ M8  Scaling          ████████████████  Redis clu
 
 ### Deliverables
 
-#### Types & Enums
-- [ ] `FrameKind` enum со всеми frame types (0x01–0x4A)
-- [ ] `ErrorCode` enum с slugs, `is_permanent()` / `is_transient()`
-- [ ] `DisconnectCode` enum с `should_reconnect()`
-- [ ] `ChatKind`, `MessageKind`, `MessageStatus`
-- [ ] `ChatRole` (Ord) + `Permission` (bitflags i64) + `default_permissions()`
-- [ ] `RichStyle` (bitflags u16) для rich text spans
-- [ ] `ServerCapabilities` (bitflags u32)
-- [ ] `ServerLimits` struct
-- [ ] `ConnectionState` enum
-
 #### Codec
-- [ ] `encode_header()` / `decode_header()` — 6-byte frame header
+- [ ] `encode_header()` / `decode_header()` — frame header
 - [ ] Encode/decode для каждого frame payload (SendMessage, Ack, Error, Welcome, Hello, etc.)
 - [ ] Message batch encode/decode (count + N messages)
 - [ ] Rich content BLOB encode/decode (spans with offsets)

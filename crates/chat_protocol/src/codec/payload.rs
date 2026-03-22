@@ -12,12 +12,13 @@ use super::wire::*;
 // ---------------------------------------------------------------------------
 
 /// Encode a `HelloPayload`.
-pub fn encode_hello(buf: &mut impl BufMut, p: &HelloPayload) {
+pub fn encode_hello(buf: &mut impl BufMut, p: &HelloPayload) -> Result<(), CodecError> {
     write_u8(buf, p.protocol_version);
     write_string(buf, &p.sdk_version);
     write_string(buf, &p.platform);
     write_string(buf, &p.token);
     write_uuid(buf, &p.device_id);
+    Ok(())
 }
 
 /// Decode a `HelloPayload`.
@@ -97,6 +98,7 @@ fn decode_server_limits(buf: &mut impl Buf) -> Result<ServerLimits, CodecError> 
 /// Encode a `SendMessagePayload`.
 pub fn encode_send_message(buf: &mut impl BufMut, p: &SendMessagePayload) {
     write_u32(buf, p.chat_id);
+    write_u8(buf, p.kind as u8);
     write_uuid(buf, &p.idempotency_key);
     write_string(buf, &p.content);
     write_optional_bytes(buf, p.rich_content.as_deref());
@@ -106,6 +108,11 @@ pub fn encode_send_message(buf: &mut impl BufMut, p: &SendMessagePayload) {
 /// Decode a `SendMessagePayload`.
 pub fn decode_send_message(buf: &mut impl Buf) -> Result<SendMessagePayload, CodecError> {
     let chat_id = read_u32(buf)?;
+    let kind_byte = read_u8(buf)?;
+    let kind = MessageKind::from_u8(kind_byte).ok_or(CodecError::UnknownDiscriminant {
+        type_name: "MessageKind",
+        value: kind_byte as u32,
+    })?;
     let idempotency_key = read_uuid(buf)?;
     let content = read_string(buf)?;
     let rich_content = read_optional_bytes(buf)?;
@@ -113,6 +120,7 @@ pub fn decode_send_message(buf: &mut impl Buf) -> Result<SendMessagePayload, Cod
 
     Ok(SendMessagePayload {
         chat_id,
+        kind,
         idempotency_key,
         content,
         rich_content,
@@ -239,7 +247,7 @@ pub fn decode_get_presence(buf: &mut impl Buf) -> Result<GetPresencePayload, Cod
 
 /// Encode a list of `PresenceEntry` values.
 pub fn encode_presence_result(buf: &mut impl BufMut, entries: &[PresenceEntry]) -> Result<(), CodecError> {
-    write_u32(buf, entries.len() as u32);
+    write_u16(buf, entries.len() as u16);
     for e in entries {
         write_u32(buf, e.user_id);
         write_u8(buf, e.status as u8);
@@ -250,7 +258,7 @@ pub fn encode_presence_result(buf: &mut impl BufMut, entries: &[PresenceEntry]) 
 
 /// Decode a list of `PresenceEntry` values.
 pub fn decode_presence_result(buf: &mut impl Buf) -> Result<Vec<PresenceEntry>, CodecError> {
-    let count = read_u32(buf)? as usize;
+    let count = read_u16(buf)? as usize;
     let mut entries = Vec::with_capacity(count.min(256));
     for _ in 0..count {
         let user_id = read_u32(buf)?;
@@ -275,16 +283,38 @@ pub fn decode_presence_result(buf: &mut impl Buf) -> Result<Vec<PresenceEntry>, 
 
 /// Encode a `LoadChatsPayload`.
 pub fn encode_load_chats(buf: &mut impl BufMut, p: &LoadChatsPayload) -> Result<(), CodecError> {
-    write_timestamp(buf, p.cursor_ts)?;
-    write_u16(buf, p.limit);
+    match p {
+        LoadChatsPayload::FirstPage { limit } => {
+            write_u8(buf, 0); // mode
+            write_u16(buf, *limit);
+        }
+        LoadChatsPayload::After { cursor_ts, limit } => {
+            write_u8(buf, 1); // mode
+            write_timestamp(buf, *cursor_ts)?;
+            write_u16(buf, *limit);
+        }
+    }
     Ok(())
 }
 
 /// Decode a `LoadChatsPayload`.
 pub fn decode_load_chats(buf: &mut impl Buf) -> Result<LoadChatsPayload, CodecError> {
-    let cursor_ts = read_timestamp(buf)?;
-    let limit = read_u16(buf)?;
-    Ok(LoadChatsPayload { cursor_ts, limit })
+    let mode = read_u8(buf)?;
+    match mode {
+        0 => {
+            let limit = read_u16(buf)?;
+            Ok(LoadChatsPayload::FirstPage { limit })
+        }
+        1 => {
+            let cursor_ts = read_timestamp(buf)?;
+            let limit = read_u16(buf)?;
+            Ok(LoadChatsPayload::After { cursor_ts, limit })
+        }
+        _ => Err(CodecError::UnknownDiscriminant {
+            type_name: "LoadChats mode",
+            value: mode as u32,
+        }),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -319,26 +349,38 @@ pub fn decode_search(buf: &mut impl Buf) -> Result<SearchPayload, CodecError> {
 
 /// Encode a `SubscribePayload`.
 pub fn encode_subscribe(buf: &mut impl BufMut, p: &SubscribePayload) {
-    write_u32(buf, p.chat_id);
+    write_u16(buf, p.chat_ids.len() as u16);
+    for &id in &p.chat_ids {
+        write_u32(buf, id);
+    }
 }
 
 /// Decode a `SubscribePayload`.
 pub fn decode_subscribe(buf: &mut impl Buf) -> Result<SubscribePayload, CodecError> {
-    Ok(SubscribePayload {
-        chat_id: read_u32(buf)?,
-    })
+    let count = read_u16(buf)? as usize;
+    let mut chat_ids = Vec::with_capacity(count.min(256));
+    for _ in 0..count {
+        chat_ids.push(read_u32(buf)?);
+    }
+    Ok(SubscribePayload { chat_ids })
 }
 
 /// Encode an `UnsubscribePayload`.
 pub fn encode_unsubscribe(buf: &mut impl BufMut, p: &UnsubscribePayload) {
-    write_u32(buf, p.chat_id);
+    write_u16(buf, p.chat_ids.len() as u16);
+    for &id in &p.chat_ids {
+        write_u32(buf, id);
+    }
 }
 
 /// Decode an `UnsubscribePayload`.
 pub fn decode_unsubscribe(buf: &mut impl Buf) -> Result<UnsubscribePayload, CodecError> {
-    Ok(UnsubscribePayload {
-        chat_id: read_u32(buf)?,
-    })
+    let count = read_u16(buf)? as usize;
+    let mut chat_ids = Vec::with_capacity(count.min(256));
+    for _ in 0..count {
+        chat_ids.push(read_u32(buf)?);
+    }
+    Ok(UnsubscribePayload { chat_ids })
 }
 
 // ---------------------------------------------------------------------------

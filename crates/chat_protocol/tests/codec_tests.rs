@@ -298,7 +298,7 @@ mod unit {
             device_id: uuid::Uuid::new_v4(),
         };
         let mut buf = BytesMut::new();
-        encode_hello(&mut buf, &payload);
+        encode_hello(&mut buf, &payload).unwrap();
 
         let decoded = decode_hello(&mut buf).unwrap();
         assert_eq!(decoded, payload);
@@ -324,6 +324,7 @@ mod unit {
     fn send_message_roundtrip() {
         let payload = SendMessagePayload {
             chat_id: 1,
+            kind: MessageKind::Text,
             idempotency_key: uuid::Uuid::new_v4(),
             content: "Hello, world!".into(),
             rich_content: None,
@@ -1024,6 +1025,172 @@ mod unit {
         let decoded = decode_leave_chat(&mut buf).unwrap();
         assert_eq!(decoded, payload);
     }
+
+    // -- SendMessage with kind --
+
+    #[test]
+    fn send_message_image_kind_roundtrip() {
+        let payload = SendMessagePayload {
+            chat_id: 1,
+            kind: MessageKind::Image,
+            idempotency_key: uuid::Uuid::new_v4(),
+            content: "photo.jpg".into(),
+            rich_content: None,
+            extra: Some(r#"{"url":"https://cdn.example.com/photo.jpg"}"#.into()),
+        };
+        let mut buf = BytesMut::new();
+        encode_send_message(&mut buf, &payload);
+        let decoded = decode_send_message(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    // -- LoadChats enum --
+
+    #[test]
+    fn load_chats_first_page_roundtrip() {
+        let payload = LoadChatsPayload::FirstPage { limit: 20 };
+        let mut buf = BytesMut::new();
+        encode_load_chats(&mut buf, &payload).unwrap();
+        let decoded = decode_load_chats(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn load_chats_after_roundtrip() {
+        let payload = LoadChatsPayload::After {
+            cursor_ts: 1_711_100_000,
+            limit: 20,
+        };
+        let mut buf = BytesMut::new();
+        encode_load_chats(&mut buf, &payload).unwrap();
+        let decoded = decode_load_chats(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    // -- Subscribe batch --
+
+    #[test]
+    fn subscribe_batch_roundtrip() {
+        let payload = SubscribePayload {
+            chat_ids: vec![1, 2, 3, 100],
+        };
+        let mut buf = BytesMut::new();
+        encode_subscribe(&mut buf, &payload);
+        let decoded = decode_subscribe(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn subscribe_single_roundtrip() {
+        let payload = SubscribePayload { chat_ids: vec![42] };
+        let mut buf = BytesMut::new();
+        encode_subscribe(&mut buf, &payload);
+        let decoded = decode_subscribe(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn subscribe_empty_roundtrip() {
+        let payload = SubscribePayload { chat_ids: vec![] };
+        let mut buf = BytesMut::new();
+        encode_subscribe(&mut buf, &payload);
+        let decoded = decode_subscribe(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn unsubscribe_batch_roundtrip() {
+        let payload = UnsubscribePayload {
+            chat_ids: vec![1, 2, 3],
+        };
+        let mut buf = BytesMut::new();
+        encode_unsubscribe(&mut buf, &payload);
+        let decoded = decode_unsubscribe(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    // -- Frame encode/decode roundtrip --
+
+    #[test]
+    fn frame_ping_roundtrip() {
+        let frame = Frame {
+            seq: 0,
+            payload: FramePayload::Ping,
+        };
+        let mut buf = BytesMut::new();
+        encode_frame(&mut buf, &frame).unwrap();
+        let decoded = decode_frame(&mut buf).unwrap();
+        assert_eq!(decoded, frame);
+    }
+
+    #[test]
+    fn frame_send_message_roundtrip() {
+        let frame = Frame {
+            seq: 7,
+            payload: FramePayload::SendMessage(SendMessagePayload {
+                chat_id: 1,
+                kind: MessageKind::Text,
+                idempotency_key: uuid::Uuid::new_v4(),
+                content: "hello".into(),
+                rich_content: None,
+                extra: None,
+            }),
+        };
+        let mut buf = BytesMut::new();
+        encode_frame(&mut buf, &frame).unwrap();
+        let decoded = decode_frame(&mut buf).unwrap();
+        assert_eq!(decoded, frame);
+    }
+
+    #[test]
+    fn frame_error_roundtrip() {
+        let frame = Frame {
+            seq: 3,
+            payload: FramePayload::Error(ErrorPayload {
+                code: ErrorCode::RateLimited,
+                message: "slow down".into(),
+                retry_after_ms: 5000,
+                extra: None,
+            }),
+        };
+        let mut buf = BytesMut::new();
+        encode_frame(&mut buf, &frame).unwrap();
+        let decoded = decode_frame(&mut buf).unwrap();
+        assert_eq!(decoded, frame);
+    }
+
+    #[test]
+    fn frame_subscribe_batch_roundtrip() {
+        let frame = Frame {
+            seq: 1,
+            payload: FramePayload::Subscribe(SubscribePayload {
+                chat_ids: vec![10, 20, 30],
+            }),
+        };
+        let mut buf = BytesMut::new();
+        encode_frame(&mut buf, &frame).unwrap();
+        let decoded = decode_frame(&mut buf).unwrap();
+        assert_eq!(decoded, frame);
+    }
+
+    #[test]
+    fn frame_load_chats_first_page_roundtrip() {
+        let frame = Frame {
+            seq: 2,
+            payload: FramePayload::LoadChats(LoadChatsPayload::FirstPage { limit: 50 }),
+        };
+        let mut buf = BytesMut::new();
+        encode_frame(&mut buf, &frame).unwrap();
+        let decoded = decode_frame(&mut buf).unwrap();
+        assert_eq!(decoded, frame);
+    }
+
+    #[test]
+    fn frame_payload_kind_consistency() {
+        assert_eq!(FramePayload::Ping.kind(), FrameKind::Ping);
+        assert_eq!(FramePayload::Pong.kind(), FrameKind::Pong);
+        assert_eq!(FramePayload::Ack(AckPayload::Empty).kind(), FrameKind::Ack);
+    }
 }
 
 // ===========================================================================
@@ -1214,7 +1381,7 @@ mod proptests {
                 device_id: uuid::Uuid::new_v4(),
             };
             let mut buf = BytesMut::new();
-            encode_hello(&mut buf, &payload);
+            encode_hello(&mut buf, &payload).unwrap();
             let decoded = decode_hello(&mut buf).unwrap();
             prop_assert_eq!(decoded, payload);
         }
@@ -1266,6 +1433,106 @@ mod proptests {
             encode_user_entry(&mut buf, &entry).unwrap();
             let decoded = decode_user_entry(&mut buf).unwrap();
             prop_assert_eq!(decoded, entry);
+        }
+
+        #[test]
+        fn send_message_roundtrip(
+            chat_id in any::<u32>(),
+            kind_idx in 0u8..3,
+            content in arb_short_string(),
+            extra in prop::option::of(arb_short_string()),
+        ) {
+            let kind = MessageKind::from_u8(kind_idx).unwrap();
+            let payload = SendMessagePayload {
+                chat_id,
+                kind,
+                idempotency_key: uuid::Uuid::new_v4(),
+                content,
+                rich_content: None,
+                extra: extra.filter(|s| !s.is_empty()),
+            };
+            let mut buf = BytesMut::new();
+            encode_send_message(&mut buf, &payload);
+            let decoded = decode_send_message(&mut buf).unwrap();
+            prop_assert_eq!(decoded, payload);
+        }
+
+        #[test]
+        fn load_chats_roundtrip(limit in any::<u16>(), cursor_ts in arb_timestamp()) {
+            // FirstPage
+            let p1 = LoadChatsPayload::FirstPage { limit };
+            let mut buf = BytesMut::new();
+            encode_load_chats(&mut buf, &p1).unwrap();
+            let d1 = decode_load_chats(&mut buf).unwrap();
+            prop_assert_eq!(d1, p1);
+
+            // After
+            let p2 = LoadChatsPayload::After { cursor_ts, limit };
+            let mut buf = BytesMut::new();
+            encode_load_chats(&mut buf, &p2).unwrap();
+            let d2 = decode_load_chats(&mut buf).unwrap();
+            prop_assert_eq!(d2, p2);
+        }
+
+        #[test]
+        fn subscribe_roundtrip(ids in prop::collection::vec(any::<u32>(), 0..50)) {
+            let payload = SubscribePayload { chat_ids: ids };
+            let mut buf = BytesMut::new();
+            encode_subscribe(&mut buf, &payload);
+            let decoded = decode_subscribe(&mut buf).unwrap();
+            prop_assert_eq!(decoded, payload);
+        }
+
+        #[test]
+        fn error_payload_roundtrip(
+            msg in arb_short_string(),
+            retry in any::<u32>(),
+            extra in prop::option::of(arb_short_string()),
+        ) {
+            let payload = ErrorPayload {
+                code: ErrorCode::InternalError,
+                message: msg,
+                retry_after_ms: retry,
+                extra: extra.filter(|s| !s.is_empty()),
+            };
+            let mut buf = BytesMut::new();
+            encode_error(&mut buf, &payload);
+            let decoded = decode_error(&mut buf).unwrap();
+            prop_assert_eq!(decoded, payload);
+        }
+
+        #[test]
+        fn load_messages_roundtrip(
+            chat_id in any::<u32>(),
+            anchor_id in any::<u32>(),
+            limit in any::<u16>(),
+            dir in 0u8..2,
+        ) {
+            let payload = LoadMessagesPayload::Paginate {
+                chat_id,
+                direction: LoadDirection::from_u8(dir).unwrap(),
+                anchor_id,
+                limit,
+            };
+            let mut buf = BytesMut::new();
+            encode_load_messages(&mut buf, &payload).unwrap();
+            let decoded = decode_load_messages(&mut buf).unwrap();
+            prop_assert_eq!(decoded, payload);
+        }
+
+        #[test]
+        fn presence_result_roundtrip(count in 0usize..50) {
+            let entries: Vec<PresenceEntry> = (0..count as u32)
+                .map(|i| PresenceEntry {
+                    user_id: i,
+                    status: if i % 2 == 0 { PresenceStatus::Online } else { PresenceStatus::Offline },
+                    last_seen: if i % 2 == 0 { 0 } else { 1_711_100_000 },
+                })
+                .collect();
+            let mut buf = BytesMut::new();
+            encode_presence_result(&mut buf, &entries).unwrap();
+            let decoded = decode_presence_result(&mut buf).unwrap();
+            prop_assert_eq!(decoded, entries);
         }
     }
 }

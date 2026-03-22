@@ -282,6 +282,8 @@ bitflags! {
 pub struct SendMessagePayload {
     /// Target chat.
     pub chat_id: u32,
+    /// Content type. Defaults to `Text` if omitted by the client.
+    pub kind: super::MessageKind,
     /// Client-generated UUID for deduplication. Persisted 24h server-side.
     pub idempotency_key: Uuid,
     /// Plain-text message content.
@@ -344,13 +346,24 @@ pub struct GetPresencePayload {
 }
 
 /// LoadChats frame payload (client → server).
+///
+/// Two modes selected by discriminant:
+/// - Mode 0: first page (no cursor)
+/// - Mode 1: subsequent page (cursor from previous response)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LoadChatsPayload {
-    /// Pagination cursor. `0` = first page (sentinel — no real chat has `updated_at = 0`).
-    /// Subsequent pages use the `next_cursor_ts` from the previous response.
-    pub cursor_ts: i64,
-    /// Max entries to return.
-    pub limit: u16,
+pub enum LoadChatsPayload {
+    /// First page — no cursor needed.
+    FirstPage {
+        /// Max entries to return.
+        limit: u16,
+    },
+    /// Subsequent page — uses `next_cursor_ts` from previous response.
+    After {
+        /// Cursor timestamp from previous response's `next_cursor_ts`.
+        cursor_ts: i64,
+        /// Max entries to return.
+        limit: u16,
+    },
 }
 
 /// Search frame payload (client → server).
@@ -367,17 +380,21 @@ pub struct SearchPayload {
 }
 
 /// Subscribe frame payload (client → server).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Batch-subscribes to real-time events for one or more chats.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscribePayload {
-    /// Chat to subscribe to.
-    pub chat_id: u32,
+    /// Chat IDs to subscribe to.
+    pub chat_ids: Vec<u32>,
 }
 
 /// Unsubscribe frame payload (client → server, fire-and-forget).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Batch-unsubscribes from one or more chats.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsubscribePayload {
-    /// Chat to unsubscribe from.
-    pub chat_id: u32,
+    /// Chat IDs to unsubscribe from.
+    pub chat_ids: Vec<u32>,
 }
 
 /// LoadMessages mode selector.
@@ -616,4 +633,112 @@ pub enum AckPayload {
     MemberList(Vec<u8>),
     /// Search results (raw bytes).
     SearchResults(Vec<u8>),
+}
+
+// ---------------------------------------------------------------------------
+// Unified Frame enum
+// ---------------------------------------------------------------------------
+
+/// A fully decoded protocol frame (header + payload).
+///
+/// Use `encode_frame` / `decode_frame` for symmetric serialization.
+/// The `seq` field from the header is stored alongside the payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Frame {
+    /// Sequence number. `0` = fire-and-forget / server push.
+    pub seq: u32,
+    /// Frame payload (determines the frame kind on the wire).
+    pub payload: FramePayload,
+}
+
+/// Typed frame payload — one variant per `FrameKind`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FramePayload {
+    // Handshake & keepalive
+    Hello(HelloPayload),
+    Welcome(WelcomePayload),
+    Ping,
+    Pong,
+
+    // Commands (client → server)
+    SendMessage(SendMessagePayload),
+    EditMessage(EditMessagePayload),
+    DeleteMessage(DeleteMessagePayload),
+    ReadReceipt(ReadReceiptPayload),
+    Typing(TypingPayload),
+    GetPresence(GetPresencePayload),
+    LoadChats(LoadChatsPayload),
+    Search(SearchPayload),
+    Subscribe(SubscribePayload),
+    Unsubscribe(UnsubscribePayload),
+    LoadMessages(LoadMessagesPayload),
+
+    // Events (server → client)
+    MessageNew(super::Message),
+    MessageEdited(super::Message),
+    MessageDeleted(MessageDeletedPayload),
+    ReceiptUpdate(ReceiptUpdatePayload),
+    TypingUpdate(TypingUpdatePayload),
+    MemberJoined(MemberJoinedPayload),
+    MemberLeft(MemberLeftPayload),
+    PresenceResult(Vec<super::PresenceEntry>),
+    ChatUpdated(super::ChatEntry),
+    ChatCreated(super::ChatEntry),
+
+    // Responses
+    Ack(AckPayload),
+    Error(super::ErrorPayload),
+
+    // Chat management (client → server)
+    CreateChat(CreateChatPayload),
+    UpdateChat(UpdateChatPayload),
+    DeleteChat(DeleteChatPayload),
+    GetChatInfo(GetChatInfoPayload),
+    GetChatMembers(GetChatMembersPayload),
+    InviteMembers(InviteMembersPayload),
+    UpdateMember(UpdateMemberPayload),
+    LeaveChat(LeaveChatPayload),
+}
+
+impl FramePayload {
+    /// Returns the `FrameKind` for this payload variant.
+    pub fn kind(&self) -> FrameKind {
+        match self {
+            Self::Hello(_) => FrameKind::Hello,
+            Self::Welcome(_) => FrameKind::Welcome,
+            Self::Ping => FrameKind::Ping,
+            Self::Pong => FrameKind::Pong,
+            Self::SendMessage(_) => FrameKind::SendMessage,
+            Self::EditMessage(_) => FrameKind::EditMessage,
+            Self::DeleteMessage(_) => FrameKind::DeleteMessage,
+            Self::ReadReceipt(_) => FrameKind::ReadReceipt,
+            Self::Typing(_) => FrameKind::Typing,
+            Self::GetPresence(_) => FrameKind::GetPresence,
+            Self::LoadChats(_) => FrameKind::LoadChats,
+            Self::Search(_) => FrameKind::Search,
+            Self::Subscribe(_) => FrameKind::Subscribe,
+            Self::Unsubscribe(_) => FrameKind::Unsubscribe,
+            Self::LoadMessages(_) => FrameKind::LoadMessages,
+            Self::MessageNew(_) => FrameKind::MessageNew,
+            Self::MessageEdited(_) => FrameKind::MessageEdited,
+            Self::MessageDeleted(_) => FrameKind::MessageDeleted,
+            Self::ReceiptUpdate(_) => FrameKind::ReceiptUpdate,
+            Self::TypingUpdate(_) => FrameKind::TypingUpdate,
+            Self::MemberJoined(_) => FrameKind::MemberJoined,
+            Self::MemberLeft(_) => FrameKind::MemberLeft,
+            Self::PresenceResult(_) => FrameKind::PresenceResult,
+            Self::ChatUpdated(_) => FrameKind::ChatUpdated,
+            Self::ChatCreated(_) => FrameKind::ChatCreated,
+            Self::Ack(_) => FrameKind::Ack,
+            Self::Error(_) => FrameKind::Error,
+            Self::CreateChat(_) => FrameKind::CreateChat,
+            Self::UpdateChat(_) => FrameKind::UpdateChat,
+            Self::DeleteChat(_) => FrameKind::DeleteChat,
+            Self::GetChatInfo(_) => FrameKind::GetChatInfo,
+            Self::GetChatMembers(_) => FrameKind::GetChatMembers,
+            Self::InviteMembers(_) => FrameKind::InviteMembers,
+            Self::UpdateMember(_) => FrameKind::UpdateMember,
+            Self::LeaveChat(_) => FrameKind::LeaveChat,
+        }
+    }
 }

@@ -72,7 +72,7 @@ All WS binary frames share a 5-byte header:
 | UpdateChat     | 0x41  | Update chat info (title, avatar)                 |
 | DeleteChat     | 0x42  | Delete chat                                      |
 | GetChatInfo    | 0x43  | Get chat details                                 |
-| GetChatMembers | 0x44  | List chat members                                |
+| GetChatMembers | 0x44  | List chat members (paginated)                    |
 | InviteMembers  | 0x45  | Invite users                                     |
 | UpdateMember   | 0x46  | Kick, ban, mute, change role/permissions         |
 | LeaveChat      | 0x47  | Leave chat                                       |
@@ -93,6 +93,16 @@ chat_id: u32 | user_id: u32 | action: u8 | action-specific payload
 | UpdatePermissions | 4 | `permissions: u32` | Set permission override    |
 
 Response: `Ack` (empty).
+
+### GetChatMembers (0x44)
+
+```
+chat_id: u32 | cursor: u32 | limit: u16
+```
+
+`cursor = 0` means first page. Server returns members ordered by `user_id`.
+
+Response: `Ack` with payload: `next_cursor: u32`, then `count: u16` + `ChatMemberEntry` list.
 
 ## Handshake
 
@@ -128,6 +138,15 @@ Bitflags `u32` sent in Welcome. Client uses these to show/hide features.
 
 ## Key Frame Payloads
 
+### SendMessage (0x10)
+
+```
+chat_id: u32 | kind: u8 | idempotency_key: UUID | content_len: u32 | content (UTF-8) | rich_len: u32 | rich blob | extra_len: u32 | extra JSON
+```
+
+`kind` is `MessageKind` (Text=0, Image=1, File=2, System=3). Defaults to `Text` if the
+client omits it (server-side default).
+
 ### Event Payloads (server → client)
 
 **MessageNew (0x20)**: payload is a single `Message` (same wire format as in `MessageBatch`).
@@ -138,15 +157,15 @@ Bitflags `u32` sent in Welcome. Client uses these to show/hide features.
 
 ### Subscribe (0x18)
 
-`chat_id: u32`
+`count: u16`, `chat_ids: [u32]`
 
-Registers the session to receive real-time events for a chat (`MessageNew`, `MessageEdited`, `MessageDeleted`, `ReceiptUpdate`, `TypingUpdate`, `MemberJoined`, `MemberLeft`).
+Batch-subscribes the session to receive real-time events for one or more chats (`MessageNew`, `MessageEdited`, `MessageDeleted`, `ReceiptUpdate`, `TypingUpdate`, `MemberJoined`, `MemberLeft`).
 
 Response: `Ack` (empty payload). No historical messages are pushed — client loads history explicitly via `LoadMessages`.
 
 ### Unsubscribe (0x19)
 
-`chat_id: u32` — fire-and-forget, no Ack.
+`count: u16`, `chat_ids: [u32]` — fire-and-forget, no Ack.
 
 ### LoadMessages (0x1A)
 
@@ -187,18 +206,27 @@ after a successful Mode 1 response. On reconnect the set is cleared.
 
 ### LoadChats (0x16)
 
-`cursor_ts: i64` (0 = first page), `limit: u16`
+Two modes selected by `mode: u8`.
 
-`cursor_ts = 0` is a sentinel meaning "no cursor / first page". It is technically a valid
-timestamp (1970-01-01) but no real chat will have `updated_at = 0`, so there is no ambiguity.
+**Mode 0 — first page** (no cursor):
+
+```
+mode: u8=0 | limit: u16
+```
+
+**Mode 1 — subsequent page** (cursor from previous response):
+
+```
+mode: u8=1 | cursor_ts: i64 | limit: u16
+```
 
 Response: `Ack` with payload: `next_cursor_ts: i64`, then `count: u32` + chat entries.
 
 ### GetPresence (0x15)
 
-`user_ids: [u32]` (u16 count prefix)
+`count: u16`, `user_ids: [u32]`
 
-Response: `PresenceResult (0x27)` frame with the same seq.
+Response: `PresenceResult (0x27)` frame with the same seq. Payload: `count: u16` + `PresenceEntry` list.
 
 ### Search (0x17)
 

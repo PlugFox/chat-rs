@@ -37,7 +37,7 @@ cargo run -p chat_server             # Run server (dev)
 - If docs were missing important details or out of sync — update them before finishing the task.
 - No shell scripts — all automation via `xtask/` (Rust).
 - `chat_protocol` uses `thiserror` for typed errors. `chat_server` uses `anyhow` for application errors.
-- All IDs in wire protocol are `i64`. External string user IDs are mapped to internal `i64` on the server.
+- All IDs in wire protocol are `u32`. External string user IDs are mapped to internal `u32` on the server.
 
 ## Testing
 

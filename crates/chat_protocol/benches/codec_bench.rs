@@ -1,4 +1,17 @@
 //! Criterion benchmarks for chat_protocol codec.
+//!
+//! ## Baseline (2026-03-22, MacBook Pro M3 Pro, Rust 1.85, release profile)
+//!
+//! | Benchmark              | Time        |
+//! |------------------------|-------------|
+//! | header_encode          |    935 ps   |
+//! | header_decode          |   3.80 ns   |
+//! | batch_1000_encode      |   6.93 µs   |
+//! | batch_1000_decode      |  32.68 µs   |
+//! | rich_50spans_encode    | 183.48 ns   |
+//! | rich_50spans_decode    | 863.81 ns   |
+//! | batch_100_rich_encode  |   2.27 µs   |
+//! | batch_100_rich_decode  |  13.30 µs   |
 
 use bytes::BytesMut;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};

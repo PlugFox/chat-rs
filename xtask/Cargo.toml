@@ -5,3 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+anyhow = "1"
+syn = { version = "2", features = ["full", "parsing", "visit"] }
+proc-macro2 = "1"
+quote = "1"

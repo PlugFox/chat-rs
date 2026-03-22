@@ -1,17 +1,25 @@
 // xtask is a build tool, not a service — eprintln/println are the correct output mechanism here.
 #![allow(clippy::disallowed_macros)]
 
+mod check;
+mod codegen;
+
 use std::env;
-use std::process::{Command, ExitCode, exit};
+use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let task = args.first().map(String::as_str);
 
     match task {
-        Some("check") => check(),
-        Some("fmt") => fmt(),
-        Some("test") => test(),
+        Some("check") => check::check(),
+        Some("fmt") => check::fmt(),
+        Some("test") => check::test(),
+        Some("codegen") => {
+            let workspace_root = workspace_root();
+            let is_check = args.iter().any(|a| a == "--check");
+            codegen::run(&workspace_root, is_check)
+        }
         Some("help") | None => {
             print_help();
             ExitCode::SUCCESS
@@ -32,70 +40,17 @@ Usage: cargo xtask <TASK>
 Tasks:
   check    Run clippy + fmt check + tests on workspace
   fmt      Run rustfmt on workspace
-  test     Run all tests"
+  test     Run all tests
+  codegen  Generate Dart & TypeScript packages from chat_protocol
+           --check  Verify generated code is up to date (CI mode)"
     );
 }
 
-fn check() -> ExitCode {
-    let steps: &[(&str, &[&str])] = &[
-        ("Checking formatting", &["cargo", "fmt", "--all", "--check"]),
-        (
-            "Running clippy",
-            &[
-                "cargo",
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--",
-                "-D",
-                "warnings",
-            ],
-        ),
-        ("Running tests", &["cargo", "test", "--workspace"]),
-    ];
-
-    for (label, cmd) in steps {
-        eprintln!("\n=== {label} ===");
-        let status = Command::new(cmd[0]).args(&cmd[1..]).status().unwrap_or_else(|e| {
-            eprintln!("Failed to run {}: {e}", cmd[0]);
-            exit(1);
-        });
-        if !status.success() {
-            eprintln!("FAILED: {label}");
-            return ExitCode::FAILURE;
-        }
-    }
-
-    eprintln!("\n=== All checks passed ===");
-    ExitCode::SUCCESS
-}
-
-fn fmt() -> ExitCode {
-    let status = Command::new("cargo")
-        .args(["fmt", "--all"])
-        .status()
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to run cargo fmt: {e}");
-            exit(1);
-        });
-    if status.success() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
-    }
-}
-
-fn test() -> ExitCode {
-    let status = Command::new("cargo")
-        .args(["test", "--workspace"])
-        .status()
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to run cargo test: {e}");
-            exit(1);
-        });
-    if status.success() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
-    }
+/// Locate the workspace root (parent of the xtask directory).
+fn workspace_root() -> std::path::PathBuf {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    std::path::Path::new(manifest_dir)
+        .parent()
+        .expect("xtask should be in a subdirectory of the workspace root")
+        .to_owned()
 }

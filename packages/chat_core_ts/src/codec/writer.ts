@@ -62,11 +62,17 @@ export class ProtocolWriter {
       this.writeU32(0);
       return;
     }
-    const encoded = textEncoder.encode(v);
-    this.writeU32(encoded.length);
-    this.grow(encoded.length);
-    this.buf.set(encoded, this.pos);
-    this.pos += encoded.length;
+    // Reserve 4 bytes for length prefix, then encode directly into buffer.
+    // Worst case: each UTF-16 code unit → 3 UTF-8 bytes.
+    this.grow(4 + v.length * 3);
+    const lenOffset = this.pos;
+    this.pos += 4;
+    const { written } = textEncoder.encodeInto(
+      v,
+      this.buf.subarray(this.pos),
+    );
+    this.view.setUint32(lenOffset, written!, true);
+    this.pos += written!;
   }
 
   writeOptionalString(v: string | null): void {

@@ -14,17 +14,20 @@ class ProtocolReader {
 
   int get remaining => _data.lengthInBytes - _pos;
 
+  @pragma('vm:prefer-inline')
   void ensureRemaining(int n) {
     if (remaining < n) {
       throw CodecError('truncated: need $n bytes but only $remaining remain');
     }
   }
 
+  @pragma('vm:prefer-inline')
   int readU8() {
     ensureRemaining(1);
     return _data.getUint8(_pos++);
   }
 
+  @pragma('vm:prefer-inline')
   int readU16() {
     ensureRemaining(2);
     final v = _data.getUint16(_pos, Endian.little);
@@ -32,6 +35,7 @@ class ProtocolReader {
     return v;
   }
 
+  @pragma('vm:prefer-inline')
   int readU32() {
     ensureRemaining(4);
     final v = _data.getUint32(_pos, Endian.little);
@@ -39,6 +43,7 @@ class ProtocolReader {
     return v;
   }
 
+  @pragma('vm:prefer-inline')
   int readI64() {
     ensureRemaining(8);
     final v = _data.getInt64(_pos, Endian.little);
@@ -46,6 +51,7 @@ class ProtocolReader {
     return v;
   }
 
+  @pragma('vm:prefer-inline')
   int readTimestamp() {
     final v = readI64();
     if (v < 0 || v > 2199023255551) {
@@ -111,6 +117,7 @@ class ProtocolReader {
     return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
   }
 
+  @pragma('vm:prefer-inline')
   int? readOptionU32() {
     final flag = readU8();
     if (flag == 0) return null;
@@ -118,6 +125,7 @@ class ProtocolReader {
     throw CodecError('invalid Option<u32> flag: $flag');
   }
 
+  @pragma('vm:prefer-inline')
   String? readUpdatableString() {
     final flag = readU8();
     if (flag == 0) return null;

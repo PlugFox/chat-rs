@@ -20,14 +20,17 @@ class ProtocolWriter {
   /// Current number of bytes written.
   int get length => _pos;
 
+  @pragma('vm:prefer-inline')
   void _grow(int needed) {
     final required = _pos + needed;
     if (required <= _buf.length) return;
+    _growSlow(required);
+  }
+
+  void _growSlow(int required) {
     var newLen = _buf.length * 2;
     while (newLen < required) {
-      {
-        newLen *= 2;
-      }
+      newLen *= 2;
     }
     final next = Uint8List(newLen);
     next.setAll(0, Uint8List.sublistView(_buf, 0, _pos));
@@ -35,29 +38,34 @@ class ProtocolWriter {
     _data = ByteData.sublistView(next);
   }
 
+  @pragma('vm:prefer-inline')
   void writeU8(int v) {
     _grow(1);
     _data.setUint8(_pos++, v);
   }
 
+  @pragma('vm:prefer-inline')
   void writeU16(int v) {
     _grow(2);
     _data.setUint16(_pos, v, Endian.little);
     _pos += 2;
   }
 
+  @pragma('vm:prefer-inline')
   void writeU32(int v) {
     _grow(4);
     _data.setUint32(_pos, v, Endian.little);
     _pos += 4;
   }
 
+  @pragma('vm:prefer-inline')
   void writeI64(int v) {
     _grow(8);
     _data.setInt64(_pos, v, Endian.little);
     _pos += 8;
   }
 
+  @pragma('vm:prefer-inline')
   void writeTimestamp(int v) {
     if (v < 0 || v > 2199023255551) {
       throw CodecError('timestamp out of range: $v');
@@ -125,6 +133,7 @@ class ProtocolWriter {
     _buf[_pos++] = 0xBD;
   }
 
+  @pragma('vm:prefer-inline')
   void writeOptionalString(String? v) {
     if (v == null) {
       writeU32(0);
@@ -156,6 +165,7 @@ class ProtocolWriter {
     }
   }
 
+  @pragma('vm:prefer-inline')
   void writeOptionU32(int? v) {
     if (v == null) {
       writeU8(0);
@@ -165,6 +175,7 @@ class ProtocolWriter {
     }
   }
 
+  @pragma('vm:prefer-inline')
   void writeUpdatableString(String? v) {
     if (v == null) {
       writeU8(0);
@@ -181,11 +192,13 @@ class ProtocolWriter {
   }
 
   /// Patch a u32 at a previously written position.
+  @pragma('vm:prefer-inline')
   void patchU32(int offset, int v) {
     _data.setUint32(offset, v, Endian.little);
   }
 
   /// Reserve [n] bytes and return the offset. Caller fills them later.
+  @pragma('vm:prefer-inline')
   int reserve(int n) {
     _grow(n);
     final o = _pos;

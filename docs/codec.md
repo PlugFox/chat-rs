@@ -5,12 +5,15 @@ All values are little-endian (native for ARM/x86).
 ## WS Frame Header
 
 ```
-┌──────────┬───────────┬──────────────────┐
-│ kind: u8 │  seq: u32 │ payload: bytes   │
-└──────────┴───────────┴──────────────────┘
+┌──────────┬───────────┬────────────────┬──────────────────┐
+│ kind: u8 │  seq: u32 │ event_seq: u32 │ payload: bytes   │
+└──────────┴───────────┴────────────────┴──────────────────┘
 ```
 
-Total header: 5 bytes.
+Total header: 9 bytes.
+
+`event_seq` is a per-session monotonically increasing counter for server push events.
+Client → server frames set `event_seq = 0`. See [protocol.md](protocol.md#event-ordering).
 
 ## Timestamp Validation
 

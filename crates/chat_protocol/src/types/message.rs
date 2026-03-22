@@ -117,6 +117,10 @@ pub struct RichSpan {
 }
 
 /// A decoded message (as transmitted in `MessageBatch`).
+///
+/// TODO: Add `reactions` field (Vec of pack_id + emoji_index + count + user_reacted)
+/// so that reactions are persisted and available when loading message history.
+/// Currently reactions are only delivered as live `ReactionUpdate` events.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Message {
     /// Sequential per-chat ID (starts at 1).

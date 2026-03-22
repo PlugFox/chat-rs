@@ -103,6 +103,10 @@ pub fn encode_send_message(buf: &mut impl BufMut, p: &SendMessagePayload) {
     write_string(buf, &p.content);
     write_optional_bytes(buf, p.rich_content.as_deref());
     write_optional_string(buf, p.extra.as_deref());
+    write_u16(buf, p.mentioned_user_ids.len() as u16);
+    for &id in &p.mentioned_user_ids {
+        write_u32(buf, id);
+    }
 }
 
 /// Decode a `SendMessagePayload`.
@@ -117,6 +121,11 @@ pub fn decode_send_message(buf: &mut impl Buf) -> Result<SendMessagePayload, Cod
     let content = read_string(buf)?;
     let rich_content = read_optional_bytes(buf)?;
     let extra = read_optional_string(buf)?;
+    let mention_count = read_u16(buf)? as usize;
+    let mut mentioned_user_ids = Vec::with_capacity(mention_count.min(256));
+    for _ in 0..mention_count {
+        mentioned_user_ids.push(read_u32(buf)?);
+    }
 
     Ok(SendMessagePayload {
         chat_id,
@@ -125,6 +134,7 @@ pub fn decode_send_message(buf: &mut impl Buf) -> Result<SendMessagePayload, Cod
         content,
         rich_content,
         extra,
+        mentioned_user_ids,
     })
 }
 
@@ -378,38 +388,38 @@ pub fn decode_search(buf: &mut impl Buf) -> Result<SearchPayload, CodecError> {
 
 /// Encode a `SubscribePayload`.
 pub fn encode_subscribe(buf: &mut impl BufMut, p: &SubscribePayload) {
-    write_u16(buf, p.chat_ids.len() as u16);
-    for &id in &p.chat_ids {
-        write_u32(buf, id);
+    write_u16(buf, p.channels.len() as u16);
+    for ch in &p.channels {
+        write_string(buf, ch);
     }
 }
 
 /// Decode a `SubscribePayload`.
 pub fn decode_subscribe(buf: &mut impl Buf) -> Result<SubscribePayload, CodecError> {
     let count = read_u16(buf)? as usize;
-    let mut chat_ids = Vec::with_capacity(count.min(256));
+    let mut channels = Vec::with_capacity(count.min(256));
     for _ in 0..count {
-        chat_ids.push(read_u32(buf)?);
+        channels.push(read_string(buf)?);
     }
-    Ok(SubscribePayload { chat_ids })
+    Ok(SubscribePayload { channels })
 }
 
 /// Encode an `UnsubscribePayload`.
 pub fn encode_unsubscribe(buf: &mut impl BufMut, p: &UnsubscribePayload) {
-    write_u16(buf, p.chat_ids.len() as u16);
-    for &id in &p.chat_ids {
-        write_u32(buf, id);
+    write_u16(buf, p.channels.len() as u16);
+    for ch in &p.channels {
+        write_string(buf, ch);
     }
 }
 
 /// Decode an `UnsubscribePayload`.
 pub fn decode_unsubscribe(buf: &mut impl Buf) -> Result<UnsubscribePayload, CodecError> {
     let count = read_u16(buf)? as usize;
-    let mut chat_ids = Vec::with_capacity(count.min(256));
+    let mut channels = Vec::with_capacity(count.min(256));
     for _ in 0..count {
-        chat_ids.push(read_u32(buf)?);
+        channels.push(read_string(buf)?);
     }
-    Ok(UnsubscribePayload { chat_ids })
+    Ok(UnsubscribePayload { channels })
 }
 
 // ---------------------------------------------------------------------------
@@ -540,6 +550,8 @@ pub fn encode_chat_entry(buf: &mut impl BufMut, e: &ChatEntry) -> Result<(), Cod
     write_optional_string(buf, e.title.as_deref());
     write_optional_string(buf, e.avatar_url.as_deref());
     encode_optional_last_message_preview(buf, e.last_message.as_ref())?;
+    write_u32(buf, e.unread_count);
+    write_u32(buf, e.member_count);
     Ok(())
 }
 
@@ -557,6 +569,8 @@ pub fn decode_chat_entry(buf: &mut impl Buf) -> Result<ChatEntry, CodecError> {
     let title = read_optional_string(buf)?;
     let avatar_url = read_optional_string(buf)?;
     let last_message = decode_optional_last_message_preview(buf)?;
+    let unread_count = read_u32(buf)?;
+    let member_count = read_u32(buf)?;
 
     Ok(ChatEntry {
         id,
@@ -567,6 +581,8 @@ pub fn decode_chat_entry(buf: &mut impl Buf) -> Result<ChatEntry, CodecError> {
         title,
         avatar_url,
         last_message,
+        unread_count,
+        member_count,
     })
 }
 
@@ -1134,5 +1150,167 @@ pub fn decode_unpin_message(buf: &mut impl Buf) -> Result<UnpinMessagePayload, C
     Ok(UnpinMessagePayload {
         chat_id: read_u32(buf)?,
         message_id: read_u32(buf)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// RefreshToken
+// ---------------------------------------------------------------------------
+
+/// Encode a `RefreshTokenPayload`.
+pub fn encode_refresh_token(buf: &mut impl BufMut, p: &RefreshTokenPayload) {
+    write_string(buf, &p.token);
+}
+
+/// Decode a `RefreshTokenPayload`.
+pub fn decode_refresh_token(buf: &mut impl Buf) -> Result<RefreshTokenPayload, CodecError> {
+    Ok(RefreshTokenPayload {
+        token: read_string(buf)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// ForwardMessage
+// ---------------------------------------------------------------------------
+
+/// Encode a `ForwardMessagePayload`.
+pub fn encode_forward_message(buf: &mut impl BufMut, p: &ForwardMessagePayload) {
+    write_u32(buf, p.from_chat_id);
+    write_u32(buf, p.message_id);
+    write_u32(buf, p.to_chat_id);
+    write_uuid(buf, &p.idempotency_key);
+}
+
+/// Decode a `ForwardMessagePayload`.
+pub fn decode_forward_message(buf: &mut impl Buf) -> Result<ForwardMessagePayload, CodecError> {
+    Ok(ForwardMessagePayload {
+        from_chat_id: read_u32(buf)?,
+        message_id: read_u32(buf)?,
+        to_chat_id: read_u32(buf)?,
+        idempotency_key: read_uuid(buf)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// User management
+// ---------------------------------------------------------------------------
+
+/// Encode a `GetUserPayload`.
+pub fn encode_get_user(buf: &mut impl BufMut, p: &GetUserPayload) {
+    write_u32(buf, p.user_id);
+}
+
+/// Decode a `GetUserPayload`.
+pub fn decode_get_user(buf: &mut impl Buf) -> Result<GetUserPayload, CodecError> {
+    Ok(GetUserPayload {
+        user_id: read_u32(buf)?,
+    })
+}
+
+/// Encode a `GetUsersPayload`.
+pub fn encode_get_users(buf: &mut impl BufMut, p: &GetUsersPayload) {
+    write_u16(buf, p.user_ids.len() as u16);
+    for &id in &p.user_ids {
+        write_u32(buf, id);
+    }
+}
+
+/// Decode a `GetUsersPayload`.
+pub fn decode_get_users(buf: &mut impl Buf) -> Result<GetUsersPayload, CodecError> {
+    let count = read_u16(buf)? as usize;
+    let mut user_ids = Vec::with_capacity(count.min(256));
+    for _ in 0..count {
+        user_ids.push(read_u32(buf)?);
+    }
+    Ok(GetUsersPayload { user_ids })
+}
+
+/// Encode an `UpdateProfilePayload`.
+pub fn encode_update_profile(buf: &mut impl BufMut, p: &UpdateProfilePayload) {
+    encode_updatable_string(buf, p.username.as_deref());
+    encode_updatable_string(buf, p.first_name.as_deref());
+    encode_updatable_string(buf, p.last_name.as_deref());
+    encode_updatable_string(buf, p.avatar_url.as_deref());
+}
+
+/// Decode an `UpdateProfilePayload`.
+pub fn decode_update_profile(buf: &mut impl Buf) -> Result<UpdateProfilePayload, CodecError> {
+    Ok(UpdateProfilePayload {
+        username: decode_updatable_string(buf)?,
+        first_name: decode_updatable_string(buf)?,
+        last_name: decode_updatable_string(buf)?,
+        avatar_url: decode_updatable_string(buf)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// User blocking
+// ---------------------------------------------------------------------------
+
+/// Encode a `BlockUserPayload`.
+pub fn encode_block_user(buf: &mut impl BufMut, p: &BlockUserPayload) {
+    write_u32(buf, p.user_id);
+}
+
+/// Decode a `BlockUserPayload`.
+pub fn decode_block_user(buf: &mut impl Buf) -> Result<BlockUserPayload, CodecError> {
+    Ok(BlockUserPayload {
+        user_id: read_u32(buf)?,
+    })
+}
+
+/// Encode an `UnblockUserPayload`.
+pub fn encode_unblock_user(buf: &mut impl BufMut, p: &UnblockUserPayload) {
+    write_u32(buf, p.user_id);
+}
+
+/// Decode an `UnblockUserPayload`.
+pub fn decode_unblock_user(buf: &mut impl Buf) -> Result<UnblockUserPayload, CodecError> {
+    Ok(UnblockUserPayload {
+        user_id: read_u32(buf)?,
+    })
+}
+
+/// Encode a `GetBlockListPayload`.
+pub fn encode_get_block_list(buf: &mut impl BufMut, p: &GetBlockListPayload) {
+    write_u32(buf, p.cursor);
+    write_u16(buf, p.limit);
+}
+
+/// Decode a `GetBlockListPayload`.
+pub fn decode_get_block_list(buf: &mut impl Buf) -> Result<GetBlockListPayload, CodecError> {
+    Ok(GetBlockListPayload {
+        cursor: read_u32(buf)?,
+        limit: read_u16(buf)?,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Chat notification (Mute / Unmute)
+// ---------------------------------------------------------------------------
+
+/// Encode a `MuteChatPayload`.
+pub fn encode_mute_chat(buf: &mut impl BufMut, p: &MuteChatPayload) {
+    write_u32(buf, p.chat_id);
+    write_u32(buf, p.duration_secs);
+}
+
+/// Decode a `MuteChatPayload`.
+pub fn decode_mute_chat(buf: &mut impl Buf) -> Result<MuteChatPayload, CodecError> {
+    Ok(MuteChatPayload {
+        chat_id: read_u32(buf)?,
+        duration_secs: read_u32(buf)?,
+    })
+}
+
+/// Encode an `UnmuteChatPayload`.
+pub fn encode_unmute_chat(buf: &mut impl BufMut, p: &UnmuteChatPayload) {
+    write_u32(buf, p.chat_id);
+}
+
+/// Decode an `UnmuteChatPayload`.
+pub fn decode_unmute_chat(buf: &mut impl Buf) -> Result<UnmuteChatPayload, CodecError> {
+    Ok(UnmuteChatPayload {
+        chat_id: read_u32(buf)?,
     })
 }

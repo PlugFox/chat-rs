@@ -72,10 +72,11 @@ fn bench_frame_header(c: &mut Criterion) {
     let header = FrameHeader {
         kind: FrameKind::SendMessage,
         seq: 42,
+        event_seq: 0,
     };
 
     c.bench_function("header_encode", |b| {
-        let mut buf = BytesMut::with_capacity(5);
+        let mut buf = BytesMut::with_capacity(9);
         b.iter(|| {
             buf.clear();
             encode_header(&mut buf, black_box(&header));
@@ -83,7 +84,7 @@ fn bench_frame_header(c: &mut Criterion) {
     });
 
     c.bench_function("header_decode", |b| {
-        let mut encode_buf = BytesMut::with_capacity(5);
+        let mut encode_buf = BytesMut::with_capacity(9);
         encode_header(&mut encode_buf, &header);
         let data = encode_buf.freeze();
         b.iter(|| {

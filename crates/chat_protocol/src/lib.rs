@@ -25,8 +25,8 @@ pub mod types;
 /// Protocol version. Incremented on breaking wire-format changes.
 pub const PROTOCOL_VERSION: u8 = 1;
 
-/// Wire frame header size: kind(1) + seq(4) = 5 bytes.
-pub const FRAME_HEADER_SIZE: usize = 5;
+/// Wire frame header size: kind(1) + seq(4) + event_seq(4) = 9 bytes.
+pub const FRAME_HEADER_SIZE: usize = 9;
 
 /// Minimum valid timestamp (1970-01-01 00:00:00 UTC).
 pub const MIN_TIMESTAMP: i64 = 0;
@@ -35,3 +35,10 @@ pub const MIN_TIMESTAMP: i64 = 0;
 /// Fast check: `value >> 41 != 0` → reject.
 /// Catches milliseconds-instead-of-seconds bugs and is JS Number-safe.
 pub const MAX_TIMESTAMP: i64 = (1_i64 << 41) - 1;
+
+/// Bitmask for detecting event_seq overflow.
+///
+/// When `event_seq & EVENT_SEQ_OVERFLOW_MASK != 0` (top 2 bits set),
+/// the server should send `DisconnectCode::EventSeqOverflow` and close
+/// so the client reconnects with a fresh counter.
+pub const EVENT_SEQ_OVERFLOW_MASK: u32 = 0xC000_0000;

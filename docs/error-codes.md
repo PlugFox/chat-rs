@@ -76,6 +76,7 @@ See `DisconnectCode` in `chat_protocol::types`.
 | 3003 | `ServerError`        | Yes       | Unrecoverable internal server error            |
 | 3004 | `BufferOverflow`     | Yes       | Client send buffer exceeded capacity           |
 | 3005 | `RateLimited`        | Yes       | Too many requests on this connection, backoff  |
+| 3006 | `EventSeqOverflow`   | Yes       | event_seq approaching u32 limit, reconnect     |
 | 3500 | `TokenInvalid`       | No        | Token is malformed or has invalid signature    |
 | 3501 | `Banned`             | No        | User is banned                                 |
 | 3502 | `UnsupportedVersion` | No        | Protocol version not supported by server       |

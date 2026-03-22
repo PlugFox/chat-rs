@@ -18,8 +18,10 @@ pub enum FrameKind {
     Ping = 0x03,
     /// Keepalive pong (both directions).
     Pong = 0x04,
+    /// Refresh JWT token without disconnecting (client → server).
+    RefreshToken = 0x05,
 
-    // Commands (0x10..0x1A, client → server)
+    // Commands (0x10..0x1E, client → server)
     /// Send a new message (persist, needs Ack).
     SendMessage = 0x10,
     /// Edit an existing message (persist, needs Ack).
@@ -50,8 +52,10 @@ pub enum FrameKind {
     PinMessage = 0x1D,
     /// Unpin a message in a chat (needs Ack).
     UnpinMessage = 0x1E,
+    /// Forward a message to another chat (persist, needs Ack).
+    ForwardMessage = 0x1F,
 
-    // Events (0x20..0x29, server → client)
+    // Events (0x20..0x2B, server → client)
     /// New message delivered in real-time. Payload: single `Message`.
     MessageNew = 0x20,
     /// Message content changed. Payload: single `Message` with updated fields.
@@ -74,6 +78,8 @@ pub enum FrameKind {
     ChatCreated = 0x29,
     /// Reaction added or removed on a message.
     ReactionUpdate = 0x2A,
+    /// User profile changed (server → client push).
+    UserUpdated = 0x2B,
 
     // Responses (0x30..0x31)
     /// Command acknowledged.
@@ -98,6 +104,24 @@ pub enum FrameKind {
     UpdateMember = 0x46,
     /// Leave a chat.
     LeaveChat = 0x47,
+    /// Mute chat notifications (client → server, RPC).
+    MuteChat = 0x48,
+    /// Unmute chat notifications (client → server, RPC).
+    UnmuteChat = 0x49,
+
+    // User management (0x50..0x55, client → server, RPC)
+    /// Get a single user's profile.
+    GetUser = 0x50,
+    /// Get multiple users' profiles.
+    GetUsers = 0x51,
+    /// Update own profile.
+    UpdateProfile = 0x52,
+    /// Block a user.
+    BlockUser = 0x53,
+    /// Unblock a user.
+    UnblockUser = 0x54,
+    /// Get block list.
+    GetBlockList = 0x55,
 }
 
 impl FrameKind {
@@ -108,6 +132,7 @@ impl FrameKind {
             0x02 => Some(Self::Welcome),
             0x03 => Some(Self::Ping),
             0x04 => Some(Self::Pong),
+            0x05 => Some(Self::RefreshToken),
 
             0x10 => Some(Self::SendMessage),
             0x11 => Some(Self::EditMessage),
@@ -124,6 +149,7 @@ impl FrameKind {
             0x1C => Some(Self::RemoveReaction),
             0x1D => Some(Self::PinMessage),
             0x1E => Some(Self::UnpinMessage),
+            0x1F => Some(Self::ForwardMessage),
 
             0x20 => Some(Self::MessageNew),
             0x21 => Some(Self::MessageEdited),
@@ -136,6 +162,7 @@ impl FrameKind {
             0x28 => Some(Self::ChatUpdated),
             0x29 => Some(Self::ChatCreated),
             0x2A => Some(Self::ReactionUpdate),
+            0x2B => Some(Self::UserUpdated),
 
             0x30 => Some(Self::Ack),
             0x31 => Some(Self::Error),
@@ -148,6 +175,15 @@ impl FrameKind {
             0x45 => Some(Self::InviteMembers),
             0x46 => Some(Self::UpdateMember),
             0x47 => Some(Self::LeaveChat),
+            0x48 => Some(Self::MuteChat),
+            0x49 => Some(Self::UnmuteChat),
+
+            0x50 => Some(Self::GetUser),
+            0x51 => Some(Self::GetUsers),
+            0x52 => Some(Self::UpdateProfile),
+            0x53 => Some(Self::BlockUser),
+            0x54 => Some(Self::UnblockUser),
+            0x55 => Some(Self::GetBlockList),
 
             _ => None,
         }
@@ -160,6 +196,7 @@ impl FrameKind {
             Self::Welcome,
             Self::Ping,
             Self::Pong,
+            Self::RefreshToken,
             Self::SendMessage,
             Self::EditMessage,
             Self::DeleteMessage,
@@ -175,6 +212,7 @@ impl FrameKind {
             Self::RemoveReaction,
             Self::PinMessage,
             Self::UnpinMessage,
+            Self::ForwardMessage,
             Self::MessageNew,
             Self::MessageEdited,
             Self::MessageDeleted,
@@ -186,6 +224,7 @@ impl FrameKind {
             Self::ChatUpdated,
             Self::ChatCreated,
             Self::ReactionUpdate,
+            Self::UserUpdated,
             Self::Ack,
             Self::Error,
             Self::CreateChat,
@@ -196,17 +235,27 @@ impl FrameKind {
             Self::InviteMembers,
             Self::UpdateMember,
             Self::LeaveChat,
+            Self::MuteChat,
+            Self::UnmuteChat,
+            Self::GetUser,
+            Self::GetUsers,
+            Self::UpdateProfile,
+            Self::BlockUser,
+            Self::UnblockUser,
+            Self::GetBlockList,
         ]
     }
 }
 
-/// Decoded frame header (5 bytes on the wire).
+/// Decoded frame header (9 bytes on the wire).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FrameHeader {
     /// Frame type.
     pub kind: FrameKind,
     /// Sequence number. `0` = fire-and-forget / server push.
     pub seq: u32,
+    /// Server-push event sequence number. `0` for client→server and server responses.
+    pub event_seq: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -312,6 +361,11 @@ pub struct SendMessagePayload {
     pub rich_content: Option<Vec<u8>>,
     /// Extra metadata JSON. `None` = no metadata.
     pub extra: Option<String>,
+    /// User IDs explicitly mentioned in this message.
+    ///
+    /// Server uses this for push notification routing (avoids parsing rich content).
+    /// When replying, the client should include the original message author's ID here.
+    pub mentioned_user_ids: Vec<u32>,
 }
 
 /// EditMessage frame payload (client → server).
@@ -415,20 +469,27 @@ pub struct SearchPayload {
 
 /// Subscribe frame payload (client → server).
 ///
-/// Batch-subscribes to real-time events for one or more chats.
+/// Subscribes to one or more named channels. Channel names follow conventions:
+/// - `"general"` — account-level events (chat list updates, user profile changes)
+/// - `"push"` — push notification events
+/// - `"chat#123"` — real-time events for chat 123 (messages, typing, receipts)
+/// - `"user#42"` — presence events for user 42
+///
+/// This channel-based model decouples subscription from specific chat IDs,
+/// allowing flexible event routing and future extensibility.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscribePayload {
-    /// Chat IDs to subscribe to.
-    pub chat_ids: Vec<u32>,
+    /// Channel names to subscribe to.
+    pub channels: Vec<String>,
 }
 
 /// Unsubscribe frame payload (client → server, fire-and-forget).
 ///
-/// Batch-unsubscribes from one or more chats.
+/// Unsubscribes from one or more named channels.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsubscribePayload {
-    /// Chat IDs to unsubscribe from.
-    pub chat_ids: Vec<u32>,
+    /// Channel names to unsubscribe from.
+    pub channels: Vec<String>,
 }
 
 /// LoadMessages mode selector.
@@ -715,6 +776,111 @@ pub struct UnpinMessagePayload {
     pub message_id: u32,
 }
 
+// --- RefreshToken payload ---
+
+/// RefreshToken frame payload (client → server).
+///
+/// Allows the client to refresh its JWT without disconnecting.
+/// Server responds with Ack (empty) on success, or Error if the new token is invalid.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefreshTokenPayload {
+    /// New JWT authentication token.
+    pub token: String,
+}
+
+// --- ForwardMessage payload ---
+
+/// ForwardMessage frame payload (client → server).
+///
+/// Server copies the original message content to the target chat,
+/// sets `MessageFlags::FORWARDED`, and populates `extra.fwd` JSON.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ForwardMessagePayload {
+    /// Source chat containing the message to forward.
+    pub from_chat_id: u32,
+    /// Message to forward.
+    pub message_id: u32,
+    /// Target chat to forward into.
+    pub to_chat_id: u32,
+    /// Client-generated UUID for deduplication.
+    pub idempotency_key: Uuid,
+}
+
+// --- User management payloads ---
+
+/// GetUser frame payload (client → server, RPC).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GetUserPayload {
+    /// User ID to look up.
+    pub user_id: u32,
+}
+
+/// GetUsers frame payload (client → server, RPC).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GetUsersPayload {
+    /// User IDs to look up (batch).
+    pub user_ids: Vec<u32>,
+}
+
+/// UpdateProfile frame payload (client → server, RPC).
+///
+/// Uses updatable string semantics (u8 flag prefix):
+/// `None` = don't change, `Some("")` = clear, `Some("value")` = set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateProfilePayload {
+    /// New username. `None` = don't change. `Some("")` = clear.
+    pub username: Option<String>,
+    /// New first name.
+    pub first_name: Option<String>,
+    /// New last name.
+    pub last_name: Option<String>,
+    /// New avatar URL.
+    pub avatar_url: Option<String>,
+}
+
+// --- User blocking payloads ---
+
+/// BlockUser frame payload (client → server, RPC).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockUserPayload {
+    /// User to block.
+    pub user_id: u32,
+}
+
+/// UnblockUser frame payload (client → server, RPC).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnblockUserPayload {
+    /// User to unblock.
+    pub user_id: u32,
+}
+
+/// GetBlockList frame payload (client → server, RPC).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GetBlockListPayload {
+    /// Pagination cursor (0 = first page).
+    pub cursor: u32,
+    /// Max entries to return.
+    pub limit: u16,
+}
+
+// --- Chat notification payloads ---
+
+/// MuteChat frame payload (client → server, RPC).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MuteChatPayload {
+    /// Target chat.
+    pub chat_id: u32,
+    /// Mute duration in seconds. `0` = mute forever.
+    pub duration_secs: u32,
+}
+
+/// UnmuteChat frame payload (client → server, RPC).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnmuteChatPayload {
+    /// Target chat.
+    pub chat_id: u32,
+}
+
 /// Ack payload — command-specific response data.
 ///
 /// The variant is determined by the `FrameKind` of the original request.
@@ -740,6 +906,12 @@ pub enum AckPayload {
     MemberList(Vec<u8>),
     /// Search results (raw bytes).
     SearchResults(Vec<u8>),
+    /// GetUser: single user entry (raw bytes, decode with `decode_user_entry`).
+    UserInfo(Vec<u8>),
+    /// GetUsers: user entries list (raw bytes).
+    UserList(Vec<u8>),
+    /// GetBlockList: blocked user IDs (raw bytes).
+    BlockList(Vec<u8>),
 }
 
 // ---------------------------------------------------------------------------
@@ -754,6 +926,15 @@ pub enum AckPayload {
 pub struct Frame {
     /// Sequence number. `0` = fire-and-forget / server push.
     pub seq: u32,
+    /// Server-push event sequence number (monotonically increasing per session).
+    ///
+    /// - Client → server: always `0` (ignored by server).
+    /// - Server → client push (seq=0): monotonically increasing counter.
+    /// - Server → client response (seq>0): `0`.
+    ///
+    /// When `event_seq & EVENT_SEQ_OVERFLOW_MASK != 0`, server sends
+    /// `DisconnectCode::EventSeqOverflow` and the client should reconnect.
+    pub event_seq: u32,
     /// Frame payload (determines the frame kind on the wire).
     pub payload: FramePayload,
 }
@@ -766,6 +947,7 @@ pub enum FramePayload {
     Welcome(WelcomePayload),
     Ping,
     Pong,
+    RefreshToken(RefreshTokenPayload),
 
     // Commands (client → server)
     SendMessage(SendMessagePayload),
@@ -784,6 +966,7 @@ pub enum FramePayload {
     RemoveReaction(RemoveReactionPayload),
     PinMessage(PinMessagePayload),
     UnpinMessage(UnpinMessagePayload),
+    ForwardMessage(ForwardMessagePayload),
 
     // Events (server → client)
     MessageNew(super::Message),
@@ -797,6 +980,7 @@ pub enum FramePayload {
     ChatUpdated(super::ChatEntry),
     ChatCreated(super::ChatEntry),
     ReactionUpdate(ReactionUpdatePayload),
+    UserUpdated(super::UserEntry),
 
     // Responses
     Ack(AckPayload),
@@ -811,6 +995,16 @@ pub enum FramePayload {
     InviteMembers(InviteMembersPayload),
     UpdateMember(UpdateMemberPayload),
     LeaveChat(LeaveChatPayload),
+    MuteChat(MuteChatPayload),
+    UnmuteChat(UnmuteChatPayload),
+
+    // User management (client → server)
+    GetUser(GetUserPayload),
+    GetUsers(GetUsersPayload),
+    UpdateProfile(UpdateProfilePayload),
+    BlockUser(BlockUserPayload),
+    UnblockUser(UnblockUserPayload),
+    GetBlockList(GetBlockListPayload),
 }
 
 impl FramePayload {
@@ -821,6 +1015,7 @@ impl FramePayload {
             Self::Welcome(_) => FrameKind::Welcome,
             Self::Ping => FrameKind::Ping,
             Self::Pong => FrameKind::Pong,
+            Self::RefreshToken(_) => FrameKind::RefreshToken,
             Self::SendMessage(_) => FrameKind::SendMessage,
             Self::EditMessage(_) => FrameKind::EditMessage,
             Self::DeleteMessage(_) => FrameKind::DeleteMessage,
@@ -836,6 +1031,7 @@ impl FramePayload {
             Self::RemoveReaction(_) => FrameKind::RemoveReaction,
             Self::PinMessage(_) => FrameKind::PinMessage,
             Self::UnpinMessage(_) => FrameKind::UnpinMessage,
+            Self::ForwardMessage(_) => FrameKind::ForwardMessage,
             Self::MessageNew(_) => FrameKind::MessageNew,
             Self::MessageEdited(_) => FrameKind::MessageEdited,
             Self::MessageDeleted(_) => FrameKind::MessageDeleted,
@@ -847,6 +1043,7 @@ impl FramePayload {
             Self::ChatUpdated(_) => FrameKind::ChatUpdated,
             Self::ChatCreated(_) => FrameKind::ChatCreated,
             Self::ReactionUpdate(_) => FrameKind::ReactionUpdate,
+            Self::UserUpdated(_) => FrameKind::UserUpdated,
             Self::Ack(_) => FrameKind::Ack,
             Self::Error(_) => FrameKind::Error,
             Self::CreateChat(_) => FrameKind::CreateChat,
@@ -857,6 +1054,14 @@ impl FramePayload {
             Self::InviteMembers(_) => FrameKind::InviteMembers,
             Self::UpdateMember(_) => FrameKind::UpdateMember,
             Self::LeaveChat(_) => FrameKind::LeaveChat,
+            Self::MuteChat(_) => FrameKind::MuteChat,
+            Self::UnmuteChat(_) => FrameKind::UnmuteChat,
+            Self::GetUser(_) => FrameKind::GetUser,
+            Self::GetUsers(_) => FrameKind::GetUsers,
+            Self::UpdateProfile(_) => FrameKind::UpdateProfile,
+            Self::BlockUser(_) => FrameKind::BlockUser,
+            Self::UnblockUser(_) => FrameKind::UnblockUser,
+            Self::GetBlockList(_) => FrameKind::GetBlockList,
         }
     }
 }

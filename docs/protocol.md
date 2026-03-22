@@ -4,29 +4,31 @@
 
 ## Frame Format
 
-All WS binary frames share a 5-byte header:
+All WS binary frames share a 9-byte header:
 
 ```
-┌──────────┬───────────┬──────────────────┐
-│ kind: u8 │  seq: u32 │ payload: bytes   │
-└──────────┴───────────┴──────────────────┘
+┌──────────┬───────────┬────────────────┬──────────────────┐
+│ kind: u8 │  seq: u32 │ event_seq: u32 │ payload: bytes   │
+└──────────┴───────────┴────────────────┴──────────────────┘
 ```
 
 - `kind` — frame type (`FrameKind` enum)
 - `seq` — sequence number; see [codec.md](codec.md) for the request/response model
+- `event_seq` — server push event counter (see [Event Ordering](#event-ordering))
 
 ## Frame Kinds
 
-### Handshake & Keepalive (0x01..0x04)
+### Handshake & Keepalive (0x01..0x05)
 
-| Kind    | Value | Direction       | Purpose                            |
-| ------- | ----- | --------------- | ---------------------------------- |
-| Hello   | 0x01  | client → server | Protocol version, token, device_id |
-| Welcome | 0x02  | server → client | session_id, server_time, limits    |
-| Ping    | 0x03  | both            | Keepalive                          |
-| Pong    | 0x04  | both            | Keepalive response                 |
+| Kind         | Value | Direction       | Purpose                              |
+| ------------ | ----- | --------------- | ------------------------------------ |
+| Hello        | 0x01  | client → server | Protocol version, token, device_id   |
+| Welcome      | 0x02  | server → client | session_id, server_time, limits      |
+| Ping         | 0x03  | both            | Keepalive                            |
+| Pong         | 0x04  | both            | Keepalive response                   |
+| RefreshToken | 0x05  | client → server | Refresh JWT without disconnecting    |
 
-### Commands (0x10..0x1E, client → server)
+### Commands (0x10..0x1F, client → server)
 
 | Kind           | Value | Persist | Needs Ack |
 | -------------- | ----- | ------- | --------- |
@@ -45,8 +47,9 @@ All WS binary frames share a 5-byte header:
 | RemoveReaction | 0x1C  | yes     | yes       |
 | PinMessage     | 0x1D  | yes     | yes       |
 | UnpinMessage   | 0x1E  | yes     | yes       |
+| ForwardMessage | 0x1F  | yes     | yes       |
 
-### Events (0x20..0x2A, server → client)
+### Events (0x20..0x2B, server → client)
 
 | Kind           | Value | Purpose                                            |
 | -------------- | ----- | -------------------------------------------------- |
@@ -61,6 +64,7 @@ All WS binary frames share a 5-byte header:
 | ChatUpdated    | 0x28  | Chat metadata changed (title, avatar)              |
 | ChatCreated    | 0x29  | New chat the user is a member of                   |
 | ReactionUpdate | 0x2A  | Reaction added or removed on a message             |
+| UserUpdated    | 0x2B  | User profile changed                               |
 
 ### Responses (0x30..0x31)
 
@@ -69,7 +73,7 @@ All WS binary frames share a 5-byte header:
 | Ack   | 0x30  | Command acknowledged |
 | Error | 0x31  | Error response       |
 
-### Chat Management (0x40..0x47, client → server, RPC)
+### Chat Management (0x40..0x49, client → server, RPC)
 
 | Kind           | Value | Purpose                                          |
 | -------------- | ----- | ------------------------------------------------ |
@@ -81,41 +85,37 @@ All WS binary frames share a 5-byte header:
 | InviteMembers  | 0x45  | Invite users                                     |
 | UpdateMember   | 0x46  | Kick, ban, unban, mute, change role/permissions  |
 | LeaveChat      | 0x47  | Leave chat                                       |
+| MuteChat       | 0x48  | Mute chat notifications                          |
+| UnmuteChat     | 0x49  | Unmute chat notifications                        |
 
-### UpdateMember (0x46)
+### User Management (0x50..0x55, client → server, RPC)
 
-Unified frame for member management. The action is determined by an `action: u8` discriminant:
+| Kind         | Value | Purpose                        |
+| ------------ | ----- | ------------------------------ |
+| GetUser      | 0x50  | Get a single user's profile    |
+| GetUsers     | 0x51  | Get multiple users' profiles   |
+| UpdateProfile| 0x52  | Update own profile             |
+| BlockUser    | 0x53  | Block a user                   |
+| UnblockUser  | 0x54  | Unblock a user                 |
+| GetBlockList | 0x55  | Get blocked users (paginated)  |
 
-```
-chat_id: u32 | user_id: u32 | action: u8 | action-specific payload
-```
+## Event Ordering
 
-| Action            | Value | Payload              | Description                    |
-| ----------------- | ----- | -------------------- | ------------------------------ |
-| Kick              | 0     | (none)               | Remove member from chat        |
-| Ban               | 1     | (none)               | Ban member from chat           |
-| Mute              | 2     | `duration_secs: u32` | Mute (0 = unmute)              |
-| ChangeRole        | 3     | `role: u8`           | Change member's role           |
-| UpdatePermissions | 4     | `permissions: u32`   | Set permission override        |
-| Unban             | 5     | (none)               | Unban a previously banned user |
+Server-push events (seq=0) carry a monotonically increasing `event_seq: u32` per session.
+Client → server frames and server responses (seq>0) always set `event_seq = 0`.
 
-Response: `Ack` (empty).
-
-### GetChatMembers (0x44)
-
-```
-chat_id: u32 | cursor: u32 | limit: u16
-```
-
-`cursor = 0` means first page. Server returns members ordered by `user_id`.
-
-Response: `Ack` with payload: `next_cursor: u32`, then `count: u16` + `ChatMemberEntry` list.
+When `event_seq & 0xC000_0000 != 0` (top 2 bits set, ~3 billion events), the server
+sends `DisconnectCode::EventSeqOverflow` (3006) and closes the connection.
+The client should reconnect — the counter resets on new sessions.
 
 ## Handshake
 
 **Hello** (client → server): `protocol_version`, `sdk_version`, `platform`, `token` (JWT), `device_id` (UUID, 16 bytes).
 
 **Welcome** (server → client): `session_id: u32`, `server_time: i64` (clock sync, Unix seconds), `user_id: u32`, `ServerLimits`, `ServerCapabilities`.
+
+**RefreshToken** (client → server): `token: String` (new JWT).
+Response: `Ack` (empty) on success. The session continues without interruption.
 
 ### ServerLimits
 
@@ -148,11 +148,25 @@ Bitflags `u32` sent in Welcome. Client uses these to show/hide features.
 ### SendMessage (0x10)
 
 ```
-chat_id: u32 | kind: u8 | idempotency_key: UUID | content_len: u32 | content (UTF-8) | rich_len: u32 | rich blob | extra_len: u32 | extra JSON
+chat_id: u32 | kind: u8 | idempotency_key: UUID | content: String | rich_content: optional bytes | extra: optional String | mention_count: u16 | mentioned_user_ids: [u32]
 ```
 
-`kind` is `MessageKind` (Text=0, Image=1, File=2, System=3). Defaults to `Text` if the
-client omits it (server-side default).
+`kind` is `MessageKind` (Text=0, Image=1, File=2, System=3).
+
+`mentioned_user_ids` — user IDs explicitly mentioned in this message. Server uses this
+for push notification routing without parsing rich content. When replying, the client
+should include the original message author's ID here.
+
+### ForwardMessage (0x1F)
+
+```
+from_chat_id: u32 | message_id: u32 | to_chat_id: u32 | idempotency_key: UUID
+```
+
+Server copies the original message content to `to_chat_id`, sets `MessageFlags::FORWARDED`,
+and populates `extra.fwd` JSON with the original chat_id, msg_id, and sender_id.
+
+Response: `Ack` with `MessageId(u32)` (the new message ID in the target chat).
 
 ### Typing (0x14)
 
@@ -162,6 +176,9 @@ chat_id: u32 | expires_in_ms: u16
 
 `expires_in_ms` — how long this typing indicator is valid. Server forwards this value
 to other clients in `TypingUpdate`. Clients auto-expire the indicator after this duration.
+
+**Stop signal**: `expires_in_ms = 0` means "typing stopped immediately" — the user
+cleared the input field or navigated away. Clients should remove the indicator on receipt.
 
 ### Event Payloads (server → client)
 
@@ -179,6 +196,9 @@ to other clients in `TypingUpdate`. Clients auto-expire the indicator after this
 **MemberLeft (0x26)**: `chat_id: u32`, `user_id: u32`.
 
 **ReactionUpdate (0x2A)**: `chat_id: u32`, `message_id: u32`, `user_id: u32`, `pack_id: u32`, `emoji_index: u8`, `added: u8` (1 = added, 0 = removed).
+
+**UserUpdated (0x2B)**: payload is a full `UserEntry`. Pushed when a user the client
+is subscribed to changes their profile.
 
 ### Reactions (0x1B..0x1C)
 
@@ -200,17 +220,28 @@ Response: `Ack` (empty). Server sets `MessageFlags::PINNED` and broadcasts `Mess
 **UnpinMessage (0x1E)**: same wire format.
 Response: `Ack` (empty). Server clears `MessageFlags::PINNED` and broadcasts `MessageEdited`.
 
-### Subscribe (0x18)
+### Subscription Model (0x18..0x19)
 
-`count: u16`, `chat_ids: [u32]`
+Subscribe/Unsubscribe use a **channel-based model**. Instead of subscribing to specific
+chat IDs, clients subscribe to named channels:
 
-Batch-subscribes the session to receive real-time events for one or more chats (`MessageNew`, `MessageEdited`, `MessageDeleted`, `ReceiptUpdate`, `TypingUpdate`, `MemberJoined`, `MemberLeft`, `ReactionUpdate`).
+```
+count: u16 | channels: [String]
+```
 
-Response: `Ack` (empty payload). No historical messages are pushed — client loads history explicitly via `LoadMessages`.
+**Channel naming conventions:**
 
-### Unsubscribe (0x19)
+| Channel pattern | Purpose                                              |
+| --------------- | ---------------------------------------------------- |
+| `general`       | Account-level events (chat list updates, etc.)       |
+| `push`          | Push notification events                             |
+| `chat#<id>`     | Real-time events for a specific chat                 |
+| `user#<id>`     | Presence and profile events for a specific user      |
 
-`count: u16`, `chat_ids: [u32]` — fire-and-forget, no Ack.
+This decouples subscription from specific chat IDs, allowing flexible event routing
+and future extensibility. Response: `Ack` (empty).
+
+`Unsubscribe` is fire-and-forget (no Ack).
 
 ### LoadMessages (0x1A)
 
@@ -232,46 +263,18 @@ Response: `Ack` with `MessageBatch` of up to `limit` messages.
 chat_id: u32 | mode: u8=1 | from_id: u32 | to_id: u32 | since_ts: i64
 ```
 
-`since_ts` = `MAX(updated_at)` of messages `[from_id..to_id]` from the client's local
-cache. Server-generated value — no clock skew risk.
-
 Response: `Ack` with `MessageBatch` containing only messages where
 `updated_at > since_ts` within `[from_id, to_id]`. Empty batch = nothing changed.
-
-**Client-side chunk tracking**
-
-To avoid redundant range checks within a session, clients maintain:
-
-```
-Map<chat_id: u32, Set<chunk: u32>>
-```
-
-where `chunk = message_id / 100` (bucket of 100 messages). A chunk is added to the set
-after a successful Mode 1 response. On reconnect the set is cleared.
 
 ### LoadChats (0x16)
 
 Two modes selected by `mode: u8`.
 
-**Mode 0 — first page** (no cursor):
+**Mode 0 — first page**: `mode: u8=0 | limit: u16`
 
-```
-mode: u8=0 | limit: u16
-```
-
-**Mode 1 — subsequent page** (cursor from previous response):
-
-```
-mode: u8=1 | cursor_ts: i64 | limit: u16
-```
+**Mode 1 — subsequent page**: `mode: u8=1 | cursor_ts: i64 | limit: u16`
 
 Response: `Ack` with payload: `next_cursor_ts: i64`, then `count: u32` + chat entries.
-
-### GetPresence (0x15)
-
-`count: u16`, `user_ids: [u32]`
-
-Response: `PresenceResult (0x27)` frame with the same seq. Payload: `count: u16` + `PresenceEntry` list.
 
 ### Search (0x17)
 
@@ -279,17 +282,13 @@ Response: `PresenceResult (0x27)` frame with the same seq. Payload: `count: u16`
 scope: u8 | scope_payload | query: String | cursor: u32 | limit: u16
 ```
 
-Search scope is selected by `scope: u8` discriminant:
-
 | Scope  | Value | Payload        | Description                              |
 | ------ | ----- | -------------- | ---------------------------------------- |
 | Chat   | 0     | `chat_id: u32` | Search within a specific chat            |
 | Global | 1     | (none)         | Search across all chats user is member of|
 | User   | 2     | `user_id: u32` | Search messages from a specific user     |
 
-`cursor = 0` means first page.
-
-Response: `Ack` with payload: `next_cursor: u32`, then `count: u32` + `(message_id: u32, snippet_len: u32, snippet: UTF-8)` entries.
+Response: `Ack` with payload: `next_cursor: u32`, then `count: u32` + search result entries.
 
 ### UpdateChat (0x41)
 
@@ -300,10 +299,57 @@ chat_id: u32 | title_flag: u8 [+ title: String] | avatar_flag: u8 [+ avatar_url:
 Each field uses a `u8 flag` prefix: `0` = don't change, `1` = set to following string
 (empty string = clear the field, i.e. set to NULL on server).
 
+### UpdateMember (0x46)
+
+```
+chat_id: u32 | user_id: u32 | action: u8 | action-specific payload
+```
+
+| Action            | Value | Payload              | Description                    |
+| ----------------- | ----- | -------------------- | ------------------------------ |
+| Kick              | 0     | (none)               | Remove member from chat        |
+| Ban               | 1     | (none)               | Ban member from chat           |
+| Mute              | 2     | `duration_secs: u32` | Mute (0 = unmute)              |
+| ChangeRole        | 3     | `role: u8`           | Change member's role           |
+| UpdatePermissions | 4     | `permissions: u32`   | Set permission override        |
+| Unban             | 5     | (none)               | Unban a previously banned user |
+
+Response: `Ack` (empty).
+
+### MuteChat / UnmuteChat (0x48..0x49)
+
+**MuteChat (0x48)**: `chat_id: u32`, `duration_secs: u32` (0 = mute forever).
+**UnmuteChat (0x49)**: `chat_id: u32`.
+Both respond with `Ack` (empty).
+
+### User Management (0x50..0x55)
+
+**GetUser (0x50)**: `user_id: u32`. Response: `Ack` with `UserInfo` (single `UserEntry`).
+
+**GetUsers (0x51)**: `count: u16`, `user_ids: [u32]`. Response: `Ack` with `UserList` (user entries).
+
+**UpdateProfile (0x52)**: Uses updatable string semantics (u8 flag prefix per field):
+`username`, `first_name`, `last_name`, `avatar_url`. Response: `Ack` (empty).
+Server broadcasts `UserUpdated` to subscribed clients.
+
+**BlockUser (0x53)**: `user_id: u32`. Response: `Ack` (empty).
+Blocked user cannot send DMs to the blocker; their messages are hidden in shared groups (client-side).
+
+**UnblockUser (0x54)**: `user_id: u32`. Response: `Ack` (empty).
+
+**GetBlockList (0x55)**: `cursor: u32`, `limit: u16`.
+Response: `Ack` with `BlockList` (paginated list of blocked user IDs).
+
+### GetPresence (0x15)
+
+`count: u16`, `user_ids: [u32]`
+
+Response: `PresenceResult (0x27)` frame with the same seq.
+
 ## Versioning
 
 Protocol version is negotiated once during the handshake via `protocol_version` in the **Hello** payload. If the server does not support the requested version, it responds with an `unsupported_version` error and closes the connection. There is no per-frame version field.
 
 ## Deduplication
 
-Each persistent command (SendMessage, EditMessage, DeleteMessage) contains an `idempotency_key: UUID` (16 bytes) generated by the client. The server stores keys for 24 hours and returns the original result for duplicates without side effects.
+Each persistent command (SendMessage, EditMessage, DeleteMessage, ForwardMessage) contains an `idempotency_key: UUID` (16 bytes) generated by the client. The server stores keys for 24 hours and returns the original result for duplicates without side effects.

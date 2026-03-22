@@ -14,6 +14,7 @@ pub fn encode_frame(buf: &mut impl BufMut, frame: &Frame) -> Result<(), CodecErr
     let header = FrameHeader {
         kind: frame.payload.kind(),
         seq: frame.seq,
+        event_seq: frame.event_seq,
     };
     encode_header(buf, &header);
 
@@ -21,6 +22,10 @@ pub fn encode_frame(buf: &mut impl BufMut, frame: &Frame) -> Result<(), CodecErr
         FramePayload::Hello(p) => encode_hello(buf, p),
         FramePayload::Welcome(p) => encode_welcome(buf, p),
         FramePayload::Ping | FramePayload::Pong => Ok(()),
+        FramePayload::RefreshToken(p) => {
+            encode_refresh_token(buf, p);
+            Ok(())
+        }
 
         FramePayload::SendMessage(p) => {
             encode_send_message(buf, p);
@@ -76,6 +81,10 @@ pub fn encode_frame(buf: &mut impl BufMut, frame: &Frame) -> Result<(), CodecErr
             encode_unpin_message(buf, p);
             Ok(())
         }
+        FramePayload::ForwardMessage(p) => {
+            encode_forward_message(buf, p);
+            Ok(())
+        }
 
         FramePayload::MessageNew(msg) | FramePayload::MessageEdited(msg) => encode_message(buf, msg),
         FramePayload::MessageDeleted(p) => {
@@ -104,6 +113,7 @@ pub fn encode_frame(buf: &mut impl BufMut, frame: &Frame) -> Result<(), CodecErr
             encode_reaction_update(buf, p);
             Ok(())
         }
+        FramePayload::UserUpdated(e) => encode_user_entry(buf, e),
 
         FramePayload::Ack(_) => {
             // Ack payloads are context-dependent — encode_frame writes only the
@@ -148,6 +158,38 @@ pub fn encode_frame(buf: &mut impl BufMut, frame: &Frame) -> Result<(), CodecErr
             encode_leave_chat(buf, p);
             Ok(())
         }
+        FramePayload::MuteChat(p) => {
+            encode_mute_chat(buf, p);
+            Ok(())
+        }
+        FramePayload::UnmuteChat(p) => {
+            encode_unmute_chat(buf, p);
+            Ok(())
+        }
+        FramePayload::GetUser(p) => {
+            encode_get_user(buf, p);
+            Ok(())
+        }
+        FramePayload::GetUsers(p) => {
+            encode_get_users(buf, p);
+            Ok(())
+        }
+        FramePayload::UpdateProfile(p) => {
+            encode_update_profile(buf, p);
+            Ok(())
+        }
+        FramePayload::BlockUser(p) => {
+            encode_block_user(buf, p);
+            Ok(())
+        }
+        FramePayload::UnblockUser(p) => {
+            encode_unblock_user(buf, p);
+            Ok(())
+        }
+        FramePayload::GetBlockList(p) => {
+            encode_get_block_list(buf, p);
+            Ok(())
+        }
     }
 }
 
@@ -162,6 +204,7 @@ pub fn decode_frame(buf: &mut impl Buf) -> Result<Frame, CodecError> {
         FrameKind::Welcome => FramePayload::Welcome(decode_welcome(buf)?),
         FrameKind::Ping => FramePayload::Ping,
         FrameKind::Pong => FramePayload::Pong,
+        FrameKind::RefreshToken => FramePayload::RefreshToken(decode_refresh_token(buf)?),
 
         FrameKind::SendMessage => FramePayload::SendMessage(decode_send_message(buf)?),
         FrameKind::EditMessage => FramePayload::EditMessage(decode_edit_message(buf)?),
@@ -178,6 +221,7 @@ pub fn decode_frame(buf: &mut impl Buf) -> Result<Frame, CodecError> {
         FrameKind::RemoveReaction => FramePayload::RemoveReaction(decode_remove_reaction(buf)?),
         FrameKind::PinMessage => FramePayload::PinMessage(decode_pin_message(buf)?),
         FrameKind::UnpinMessage => FramePayload::UnpinMessage(decode_unpin_message(buf)?),
+        FrameKind::ForwardMessage => FramePayload::ForwardMessage(decode_forward_message(buf)?),
 
         FrameKind::MessageNew => FramePayload::MessageNew(decode_message(buf)?),
         FrameKind::MessageEdited => FramePayload::MessageEdited(decode_message(buf)?),
@@ -190,6 +234,7 @@ pub fn decode_frame(buf: &mut impl Buf) -> Result<Frame, CodecError> {
         FrameKind::ChatUpdated => FramePayload::ChatUpdated(decode_chat_entry(buf)?),
         FrameKind::ChatCreated => FramePayload::ChatCreated(decode_chat_entry(buf)?),
         FrameKind::ReactionUpdate => FramePayload::ReactionUpdate(decode_reaction_update(buf)?),
+        FrameKind::UserUpdated => FramePayload::UserUpdated(decode_user_entry(buf)?),
 
         FrameKind::Ack => {
             // Capture remaining bytes — caller decodes based on original request kind.
@@ -211,10 +256,20 @@ pub fn decode_frame(buf: &mut impl Buf) -> Result<Frame, CodecError> {
         FrameKind::InviteMembers => FramePayload::InviteMembers(decode_invite_members(buf)?),
         FrameKind::UpdateMember => FramePayload::UpdateMember(decode_update_member(buf)?),
         FrameKind::LeaveChat => FramePayload::LeaveChat(decode_leave_chat(buf)?),
+        FrameKind::MuteChat => FramePayload::MuteChat(decode_mute_chat(buf)?),
+        FrameKind::UnmuteChat => FramePayload::UnmuteChat(decode_unmute_chat(buf)?),
+
+        FrameKind::GetUser => FramePayload::GetUser(decode_get_user(buf)?),
+        FrameKind::GetUsers => FramePayload::GetUsers(decode_get_users(buf)?),
+        FrameKind::UpdateProfile => FramePayload::UpdateProfile(decode_update_profile(buf)?),
+        FrameKind::BlockUser => FramePayload::BlockUser(decode_block_user(buf)?),
+        FrameKind::UnblockUser => FramePayload::UnblockUser(decode_unblock_user(buf)?),
+        FrameKind::GetBlockList => FramePayload::GetBlockList(decode_get_block_list(buf)?),
     };
 
     Ok(Frame {
         seq: header.seq,
+        event_seq: header.event_seq,
         payload,
     })
 }

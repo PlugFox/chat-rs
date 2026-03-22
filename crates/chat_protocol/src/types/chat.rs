@@ -175,6 +175,10 @@ pub struct ChatEntry {
     pub avatar_url: Option<String>,
     /// Last message preview. `None` for empty chats.
     pub last_message: Option<LastMessagePreview>,
+    /// Number of unread messages (server-computed: `last_msg_id - last_read_msg_id`).
+    pub unread_count: u32,
+    /// Total number of members in this chat.
+    pub member_count: u32,
 }
 
 /// A chat member entry as transmitted on the wire (GetChatMembers response).

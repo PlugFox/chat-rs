@@ -28,7 +28,7 @@ mod unit {
     #[test]
     fn frame_kind_from_u8_unknown() {
         // 0x00, 0x05, 0xFF should all return None
-        for byte in [0x00, 0x05, 0x0F, 0x1F, 0x2B, 0x32, 0x4B, 0xFF] {
+        for byte in [0x00, 0x06, 0x0F, 0x2C, 0x32, 0x4C, 0x56, 0xFF] {
             assert!(FrameKind::from_u8(byte).is_none(), "expected None for 0x{byte:02x}");
         }
     }
@@ -36,7 +36,7 @@ mod unit {
     #[test]
     fn frame_kind_all_count() {
         // Ensure all() returns the expected number of variants
-        assert_eq!(FrameKind::all().len(), 40);
+        assert_eq!(FrameKind::all().len(), 51);
     }
 
     // -- ErrorCode --
@@ -167,6 +167,7 @@ mod unit {
         let header = FrameHeader {
             kind: FrameKind::SendMessage,
             seq: 42,
+            event_seq: 0,
         };
         let mut buf = BytesMut::new();
         encode_header(&mut buf, &header);
@@ -179,7 +180,11 @@ mod unit {
     #[test]
     fn header_all_kinds_roundtrip() {
         for &kind in FrameKind::all() {
-            let header = FrameHeader { kind, seq: 0xDEAD };
+            let header = FrameHeader {
+                kind,
+                seq: 0xDEAD,
+                event_seq: 0,
+            };
             let mut buf = BytesMut::new();
             encode_header(&mut buf, &header);
 
@@ -329,6 +334,7 @@ mod unit {
             content: "Hello, world!".into(),
             rich_content: None,
             extra: Some(r#"{"key":"value"}"#.into()),
+            mentioned_user_ids: vec![42, 99],
         };
         let mut buf = BytesMut::new();
         encode_send_message(&mut buf, &payload);
@@ -424,6 +430,8 @@ mod unit {
             title: Some("Test Group".into()),
             avatar_url: Some("https://example.com/avatar.png".into()),
             last_message: None,
+            unread_count: 0,
+            member_count: 0,
         };
         let mut buf = BytesMut::new();
         encode_chat_entry(&mut buf, &entry).unwrap();
@@ -443,12 +451,14 @@ mod unit {
             title: None,
             avatar_url: None,
             last_message: None,
+            unread_count: 0,
+            member_count: 0,
         };
         let mut buf = BytesMut::new();
         encode_chat_entry(&mut buf, &entry).unwrap();
 
-        // Minimum size: 4+1+1+8+8+4+4+1(last_message flag) = 31 bytes
-        assert_eq!(buf.len(), 31);
+        // Minimum size: 4+1+1+8+8+4+4+1(last_message flag)+4(unread)+4(member) = 39 bytes
+        assert_eq!(buf.len(), 39);
 
         let decoded = decode_chat_entry(&mut buf).unwrap();
         assert_eq!(decoded, entry);
@@ -465,6 +475,8 @@ mod unit {
             title: Some("general".into()),
             avatar_url: None,
             last_message: None,
+            unread_count: 0,
+            member_count: 0,
         };
         let mut buf = BytesMut::new();
         encode_chat_entry(&mut buf, &entry).unwrap();
@@ -695,12 +707,12 @@ mod unit {
 
     #[test]
     fn truncated_header() {
-        let buf = bytes::Bytes::from_static(&[0x10]); // only 1 byte, need 5
+        let buf = bytes::Bytes::from_static(&[0x10]); // only 1 byte, need 9
         let err = decode_header(&mut buf.clone()).unwrap_err();
         assert!(matches!(
             err,
             CodecError::Truncated {
-                needed: 5,
+                needed: 9,
                 available: 1
             }
         ));
@@ -713,7 +725,7 @@ mod unit {
         assert!(matches!(
             err,
             CodecError::Truncated {
-                needed: 5,
+                needed: 9,
                 available: 0
             }
         ));
@@ -722,7 +734,7 @@ mod unit {
     #[test]
     fn unknown_frame_kind() {
         let mut buf = BytesMut::new();
-        buf.extend_from_slice(&[0xFF, 0, 0, 0, 0]); // unknown kind 0xFF
+        buf.extend_from_slice(&[0xFF, 0, 0, 0, 0, 0, 0, 0, 0]); // unknown kind 0xFF
         let err = decode_header(&mut buf.freeze()).unwrap_err();
         assert!(matches!(err, CodecError::UnknownFrameKind(0xFF)));
     }
@@ -1043,6 +1055,7 @@ mod unit {
             content: "photo.jpg".into(),
             rich_content: None,
             extra: Some(r#"{"url":"https://cdn.example.com/photo.jpg"}"#.into()),
+            mentioned_user_ids: vec![],
         };
         let mut buf = BytesMut::new();
         encode_send_message(&mut buf, &payload);
@@ -1078,7 +1091,7 @@ mod unit {
     #[test]
     fn subscribe_batch_roundtrip() {
         let payload = SubscribePayload {
-            chat_ids: vec![1, 2, 3, 100],
+            channels: vec!["general".into(), "chat#1".into(), "chat#100".into()],
         };
         let mut buf = BytesMut::new();
         encode_subscribe(&mut buf, &payload);
@@ -1088,7 +1101,9 @@ mod unit {
 
     #[test]
     fn subscribe_single_roundtrip() {
-        let payload = SubscribePayload { chat_ids: vec![42] };
+        let payload = SubscribePayload {
+            channels: vec!["chat#42".into()],
+        };
         let mut buf = BytesMut::new();
         encode_subscribe(&mut buf, &payload);
         let decoded = decode_subscribe(&mut buf).unwrap();
@@ -1097,7 +1112,7 @@ mod unit {
 
     #[test]
     fn subscribe_empty_roundtrip() {
-        let payload = SubscribePayload { chat_ids: vec![] };
+        let payload = SubscribePayload { channels: vec![] };
         let mut buf = BytesMut::new();
         encode_subscribe(&mut buf, &payload);
         let decoded = decode_subscribe(&mut buf).unwrap();
@@ -1107,7 +1122,7 @@ mod unit {
     #[test]
     fn unsubscribe_batch_roundtrip() {
         let payload = UnsubscribePayload {
-            chat_ids: vec![1, 2, 3],
+            channels: vec!["chat#1".into(), "chat#2".into(), "chat#3".into()],
         };
         let mut buf = BytesMut::new();
         encode_unsubscribe(&mut buf, &payload);
@@ -1121,6 +1136,7 @@ mod unit {
     fn frame_ping_roundtrip() {
         let frame = Frame {
             seq: 0,
+            event_seq: 0,
             payload: FramePayload::Ping,
         };
         let mut buf = BytesMut::new();
@@ -1133,6 +1149,7 @@ mod unit {
     fn frame_send_message_roundtrip() {
         let frame = Frame {
             seq: 7,
+            event_seq: 0,
             payload: FramePayload::SendMessage(SendMessagePayload {
                 chat_id: 1,
                 kind: MessageKind::Text,
@@ -1140,6 +1157,7 @@ mod unit {
                 content: "hello".into(),
                 rich_content: None,
                 extra: None,
+                mentioned_user_ids: vec![],
             }),
         };
         let mut buf = BytesMut::new();
@@ -1152,6 +1170,7 @@ mod unit {
     fn frame_error_roundtrip() {
         let frame = Frame {
             seq: 3,
+            event_seq: 0,
             payload: FramePayload::Error(ErrorPayload {
                 code: ErrorCode::RateLimited,
                 message: "slow down".into(),
@@ -1169,8 +1188,9 @@ mod unit {
     fn frame_subscribe_batch_roundtrip() {
         let frame = Frame {
             seq: 1,
+            event_seq: 0,
             payload: FramePayload::Subscribe(SubscribePayload {
-                chat_ids: vec![10, 20, 30],
+                channels: vec!["chat#10".into(), "chat#20".into(), "chat#30".into()],
             }),
         };
         let mut buf = BytesMut::new();
@@ -1183,6 +1203,7 @@ mod unit {
     fn frame_load_chats_first_page_roundtrip() {
         let frame = Frame {
             seq: 2,
+            event_seq: 0,
             payload: FramePayload::LoadChats(LoadChatsPayload::FirstPage { limit: 50 }),
         };
         let mut buf = BytesMut::new();
@@ -1196,6 +1217,279 @@ mod unit {
         assert_eq!(FramePayload::Ping.kind(), FrameKind::Ping);
         assert_eq!(FramePayload::Pong.kind(), FrameKind::Pong);
         assert_eq!(FramePayload::Ack(AckPayload::Empty).kind(), FrameKind::Ack);
+    }
+
+    // -- New frame roundtrips --
+
+    #[test]
+    fn add_reaction_roundtrip() {
+        let payload = AddReactionPayload {
+            chat_id: 1,
+            message_id: 42,
+            pack_id: 0,
+            emoji_index: 5,
+        };
+        let mut buf = BytesMut::new();
+        encode_add_reaction(&mut buf, &payload);
+        let decoded = decode_add_reaction(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn remove_reaction_roundtrip() {
+        let payload = RemoveReactionPayload {
+            chat_id: 1,
+            message_id: 42,
+            pack_id: 100,
+            emoji_index: 255,
+        };
+        let mut buf = BytesMut::new();
+        encode_remove_reaction(&mut buf, &payload);
+        let decoded = decode_remove_reaction(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn reaction_update_roundtrip() {
+        let payload = ReactionUpdatePayload {
+            chat_id: 1,
+            message_id: 42,
+            user_id: 7,
+            pack_id: 0,
+            emoji_index: 3,
+            added: true,
+        };
+        let mut buf = BytesMut::new();
+        encode_reaction_update(&mut buf, &payload);
+        let decoded = decode_reaction_update(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn pin_unpin_roundtrip() {
+        let pin = PinMessagePayload {
+            chat_id: 1,
+            message_id: 42,
+        };
+        let mut buf = BytesMut::new();
+        encode_pin_message(&mut buf, &pin);
+        assert_eq!(decode_pin_message(&mut buf).unwrap(), pin);
+
+        let unpin = UnpinMessagePayload {
+            chat_id: 1,
+            message_id: 42,
+        };
+        let mut buf = BytesMut::new();
+        encode_unpin_message(&mut buf, &unpin);
+        assert_eq!(decode_unpin_message(&mut buf).unwrap(), unpin);
+    }
+
+    #[test]
+    fn refresh_token_roundtrip() {
+        let payload = RefreshTokenPayload {
+            token: "new-jwt-token".into(),
+        };
+        let mut buf = BytesMut::new();
+        encode_refresh_token(&mut buf, &payload);
+        let decoded = decode_refresh_token(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn forward_message_roundtrip() {
+        let payload = ForwardMessagePayload {
+            from_chat_id: 1,
+            message_id: 42,
+            to_chat_id: 2,
+            idempotency_key: uuid::Uuid::new_v4(),
+        };
+        let mut buf = BytesMut::new();
+        encode_forward_message(&mut buf, &payload);
+        let decoded = decode_forward_message(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn get_user_roundtrip() {
+        let payload = GetUserPayload { user_id: 42 };
+        let mut buf = BytesMut::new();
+        encode_get_user(&mut buf, &payload);
+        assert_eq!(decode_get_user(&mut buf).unwrap(), payload);
+    }
+
+    #[test]
+    fn get_users_roundtrip() {
+        let payload = GetUsersPayload {
+            user_ids: vec![1, 2, 3],
+        };
+        let mut buf = BytesMut::new();
+        encode_get_users(&mut buf, &payload);
+        assert_eq!(decode_get_users(&mut buf).unwrap(), payload);
+    }
+
+    #[test]
+    fn update_profile_roundtrip() {
+        let payload = UpdateProfilePayload {
+            username: Some("newname".into()),
+            first_name: None,
+            last_name: Some("".into()), // clear
+            avatar_url: None,
+        };
+        let mut buf = BytesMut::new();
+        encode_update_profile(&mut buf, &payload);
+        assert_eq!(decode_update_profile(&mut buf).unwrap(), payload);
+    }
+
+    #[test]
+    fn block_unblock_roundtrip() {
+        let block = BlockUserPayload { user_id: 42 };
+        let mut buf = BytesMut::new();
+        encode_block_user(&mut buf, &block);
+        assert_eq!(decode_block_user(&mut buf).unwrap(), block);
+
+        let unblock = UnblockUserPayload { user_id: 42 };
+        let mut buf = BytesMut::new();
+        encode_unblock_user(&mut buf, &unblock);
+        assert_eq!(decode_unblock_user(&mut buf).unwrap(), unblock);
+    }
+
+    #[test]
+    fn get_block_list_roundtrip() {
+        let payload = GetBlockListPayload { cursor: 0, limit: 50 };
+        let mut buf = BytesMut::new();
+        encode_get_block_list(&mut buf, &payload);
+        assert_eq!(decode_get_block_list(&mut buf).unwrap(), payload);
+    }
+
+    #[test]
+    fn mute_unmute_chat_roundtrip() {
+        let mute = MuteChatPayload {
+            chat_id: 1,
+            duration_secs: 3600,
+        };
+        let mut buf = BytesMut::new();
+        encode_mute_chat(&mut buf, &mute);
+        assert_eq!(decode_mute_chat(&mut buf).unwrap(), mute);
+
+        let unmute = UnmuteChatPayload { chat_id: 1 };
+        let mut buf = BytesMut::new();
+        encode_unmute_chat(&mut buf, &unmute);
+        assert_eq!(decode_unmute_chat(&mut buf).unwrap(), unmute);
+    }
+
+    #[test]
+    fn search_scope_roundtrip() {
+        // Chat scope
+        let payload = SearchPayload {
+            scope: SearchScope::Chat { chat_id: 42 },
+            query: "hello".into(),
+            cursor: 0,
+            limit: 20,
+        };
+        let mut buf = BytesMut::new();
+        encode_search(&mut buf, &payload);
+        assert_eq!(decode_search(&mut buf).unwrap(), payload);
+
+        // Global scope
+        let payload = SearchPayload {
+            scope: SearchScope::Global,
+            query: "test".into(),
+            cursor: 5,
+            limit: 10,
+        };
+        let mut buf = BytesMut::new();
+        encode_search(&mut buf, &payload);
+        assert_eq!(decode_search(&mut buf).unwrap(), payload);
+
+        // User scope
+        let payload = SearchPayload {
+            scope: SearchScope::User { user_id: 7 },
+            query: "from user".into(),
+            cursor: 0,
+            limit: 50,
+        };
+        let mut buf = BytesMut::new();
+        encode_search(&mut buf, &payload);
+        assert_eq!(decode_search(&mut buf).unwrap(), payload);
+    }
+
+    #[test]
+    fn chat_entry_with_last_message_roundtrip() {
+        let entry = ChatEntry {
+            id: 1,
+            kind: ChatKind::Group,
+            parent_id: None,
+            created_at: 1_711_100_000,
+            updated_at: 1_711_100_100,
+            title: Some("Test Group".into()),
+            avatar_url: None,
+            last_message: Some(LastMessagePreview {
+                id: 42,
+                sender_id: 7,
+                created_at: 1_711_100_050,
+                kind: MessageKind::Text,
+                flags: MessageFlags::empty(),
+                content_preview: "Hello world!".into(),
+            }),
+            unread_count: 5,
+            member_count: 12,
+        };
+        let mut buf = BytesMut::new();
+        encode_chat_entry(&mut buf, &entry).unwrap();
+        let decoded = decode_chat_entry(&mut buf).unwrap();
+        assert_eq!(decoded, entry);
+    }
+
+    #[test]
+    fn send_message_with_mentions_roundtrip() {
+        let payload = SendMessagePayload {
+            chat_id: 1,
+            kind: MessageKind::Text,
+            idempotency_key: uuid::Uuid::new_v4(),
+            content: "Hey @alice @bob".into(),
+            rich_content: None,
+            extra: None,
+            mentioned_user_ids: vec![42, 99, 7],
+        };
+        let mut buf = BytesMut::new();
+        encode_send_message(&mut buf, &payload);
+        let decoded = decode_send_message(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn unban_member_action_roundtrip() {
+        let payload = UpdateMemberPayload {
+            chat_id: 1,
+            user_id: 42,
+            action: MemberAction::Unban,
+        };
+        let mut buf = BytesMut::new();
+        encode_update_member(&mut buf, &payload);
+        let decoded = decode_update_member(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn event_seq_in_frame_roundtrip() {
+        let frame = Frame {
+            seq: 0,
+            event_seq: 12345,
+            payload: FramePayload::Ping,
+        };
+        let mut buf = BytesMut::new();
+        encode_frame(&mut buf, &frame).unwrap();
+        let decoded = decode_frame(&mut buf).unwrap();
+        assert_eq!(decoded.event_seq, 12345);
+        assert_eq!(decoded, frame);
+    }
+
+    #[test]
+    fn disconnect_code_event_seq_overflow() {
+        let code = DisconnectCode::EventSeqOverflow;
+        assert!(code.should_reconnect());
+        assert_eq!(code as u16, 3006);
+        assert_eq!(DisconnectCode::from_u16(3006), Some(code));
     }
 }
 
@@ -1298,7 +1592,7 @@ mod proptests {
 
         #[test]
         fn header_roundtrip(kind in arb_frame_kind(), seq in any::<u32>()) {
-            let header = FrameHeader { kind, seq };
+            let header = FrameHeader { kind, seq, event_seq: 0 };
             let mut buf = BytesMut::new();
             encode_header(&mut buf, &header);
             let decoded = decode_header(&mut buf.freeze()).unwrap();
@@ -1412,6 +1706,8 @@ mod proptests {
                 title: title.filter(|s| !s.is_empty()),
                 avatar_url: avatar.filter(|s| !s.is_empty()),
                 last_message: None,
+                unread_count: 0,
+                member_count: 0,
             };
             let mut buf = BytesMut::new();
             encode_chat_entry(&mut buf, &entry).unwrap();
@@ -1457,6 +1753,7 @@ mod proptests {
                 content,
                 rich_content: None,
                 extra: extra.filter(|s| !s.is_empty()),
+                mentioned_user_ids: vec![],
             };
             let mut buf = BytesMut::new();
             encode_send_message(&mut buf, &payload);
@@ -1482,8 +1779,8 @@ mod proptests {
         }
 
         #[test]
-        fn subscribe_roundtrip(ids in prop::collection::vec(any::<u32>(), 0..50)) {
-            let payload = SubscribePayload { chat_ids: ids };
+        fn subscribe_roundtrip(channels in prop::collection::vec(arb_short_string(), 0..50)) {
+            let payload = SubscribePayload { channels };
             let mut buf = BytesMut::new();
             encode_subscribe(&mut buf, &payload);
             let decoded = decode_subscribe(&mut buf).unwrap();

@@ -22,6 +22,8 @@ A **chat** is the container for messages and members. There are three kinds:
 | `created_at`  | `i64`             | `i64`            | Creation timestamp, Unix seconds (validated)      |
 | `updated_at`  | `i64`             | `i64`            | Last modification timestamp, Unix seconds         |
 | `last_message`| `u8 flag + fields`| `Option<LastMessagePreview>` | Last message preview; absent for empty chats |
+| `unread_count`| `u32`             | `u32`            | Unread messages (server-computed)             |
+| `member_count`| `u32`             | `u32`            | Total members in this chat                    |
 
 ## ChatKind
 
@@ -158,7 +160,9 @@ Followed by last message preview (`u8 flag`: 0 = absent, 1 = preview follows):
 
 `content_preview` is a server-truncated plain-text snippet (up to 100 bytes, UTF-8 safe).
 
-Minimum size: 31 bytes (DM, no parent, no strings, no last_message: 4+1+1+8+8+4+4+1).
+Followed by: `unread_count: u32`, `member_count: u32`.
+
+Minimum size: 39 bytes (DM, no parent, no strings, no last_message: 4+1+1+8+8+4+4+1+4+4).
 
 Timestamps are validated against codec range (see [codec.md](codec.md#timestamp-validation)).
 

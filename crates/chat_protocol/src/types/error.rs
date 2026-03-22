@@ -210,6 +210,8 @@ pub enum DisconnectCode {
     BufferOverflow = 3004,
     /// Too many requests on this connection, backoff.
     RateLimited = 3005,
+    /// event_seq approaching u32 limit — reconnect to reset counter.
+    EventSeqOverflow = 3006,
 
     // Server terminal (3500–3999) — reconnect: no
     /// Token is malformed or has invalid signature.
@@ -245,6 +247,7 @@ impl DisconnectCode {
             3003 => Some(Self::ServerError),
             3004 => Some(Self::BufferOverflow),
             3005 => Some(Self::RateLimited),
+            3006 => Some(Self::EventSeqOverflow),
             3500 => Some(Self::TokenInvalid),
             3501 => Some(Self::Banned),
             3502 => Some(Self::UnsupportedVersion),
@@ -262,6 +265,7 @@ impl DisconnectCode {
             Self::ServerError,
             Self::BufferOverflow,
             Self::RateLimited,
+            Self::EventSeqOverflow,
             Self::TokenInvalid,
             Self::Banned,
             Self::UnsupportedVersion,

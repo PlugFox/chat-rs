@@ -61,7 +61,6 @@ cargo run -p chat_server             # Run server (dev)
 
 | Topic                                 | File                                           |
 | ------------------------------------- | ---------------------------------------------- |
-| **Full specification**                | [SPEC.md](SPEC.md)                             |
 | **Project goals & vision**            | [docs/goals.md](docs/goals.md)                 |
 | **Roadmap & milestones**              | [docs/milestones.md](docs/milestones.md)       |
 | Architecture & crate structure        | [docs/architecture.md](docs/architecture.md)   |
@@ -77,3 +76,4 @@ cargo run -p chat_server             # Run server (dev)
 | Performance guidelines                | [docs/performance.md](docs/performance.md)     |
 | Cross-platform notes                  | [docs/crossplatform.md](docs/crossplatform.md) |
 | xtask automation                      | [docs/xtask.md](docs/xtask.md)                 |
+| Future plans & client notes           | [docs/future-plans.md](docs/future-plans.md)   |

@@ -1,6 +1,3 @@
-// GENERATED CODE — DO NOT MODIFY BY HAND
-// Source: chat_protocol
-
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -18,8 +15,9 @@ class ProtocolReader {
   int get remaining => _data.lengthInBytes - _pos;
 
   void ensureRemaining(int n) {
-    if (remaining < n)
+    if (remaining < n) {
       throw CodecError('truncated: need $n bytes but only $remaining remain');
+    }
   }
 
   int readU8() {
@@ -50,8 +48,9 @@ class ProtocolReader {
 
   int readTimestamp() {
     final v = readI64();
-    if (v < 0 || v > 2199023255551)
+    if (v < 0 || v > 2199023255551) {
       throw CodecError('timestamp out of range: $v');
+    }
     return v;
   }
 

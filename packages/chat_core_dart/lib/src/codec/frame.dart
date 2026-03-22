@@ -1,6 +1,3 @@
-// GENERATED CODE — DO NOT MODIFY BY HAND
-// Source: chat_protocol
-
 import 'dart:typed_data';
 
 import '../../chat_core.dart';

@@ -1,6 +1,3 @@
-// GENERATED CODE — DO NOT MODIFY BY HAND
-// Source: chat_protocol
-
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -63,8 +60,9 @@ class ProtocolWriter {
   }
 
   void writeTimestamp(int v) {
-    if (v < 0 || v > 2199023255551)
+    if (v < 0 || v > 2199023255551) {
       throw CodecError('timestamp out of range: $v');
+    }
     writeI64(v);
   }
 

@@ -24,6 +24,7 @@
 /// Decode: 18-63x (remaining cost: object allocation, GC pressure).
 /// Header benchmarks have highest ratio due to fixed per-call overhead vs Rust's
 /// sub-nanosecond writes to a pre-allocated buffer.
+library;
 
 import 'dart:typed_data';
 

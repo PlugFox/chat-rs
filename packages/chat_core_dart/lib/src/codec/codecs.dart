@@ -1,6 +1,3 @@
-// GENERATED CODE — DO NOT MODIFY BY HAND
-// Source: chat_protocol
-
 import '../../chat_core.dart';
 
 void encodeLastMessagePreview(ProtocolWriter w, LastMessagePreview v) {

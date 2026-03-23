@@ -58,7 +58,11 @@ Future<ChatWebSocket> $connectChatWebSocket({
   try {
     final jsProtocols =
         protocols?.map((p) => p.toJS).toList(growable: false).toJS;
-    ws = _JsWebSocket(url, jsProtocols);
+    // Do NOT pass null — JS treats null as the string "null", breaking
+    // the handshake.  Only pass protocols when explicitly provided.
+    ws = jsProtocols != null
+        ? _JsWebSocket(url, jsProtocols)
+        : _JsWebSocket(url);
     ws.binaryType = 'arraybuffer';
   } on Object catch (e, st) {
     completer.completeError(e, st);

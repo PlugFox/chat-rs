@@ -1,7 +1,8 @@
-# GENERATED — DO NOT MODIFY BY HAND
 name: chat_core
 description: Chat protocol types and binary codec.
+
 version: 0.1.0
+
 environment:
   sdk: ^3.7.0
 

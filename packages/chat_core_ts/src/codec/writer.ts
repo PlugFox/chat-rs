@@ -67,10 +67,7 @@ export class ProtocolWriter {
     this.grow(4 + v.length * 3);
     const lenOffset = this.pos;
     this.pos += 4;
-    const { written } = textEncoder.encodeInto(
-      v,
-      this.buf.subarray(this.pos),
-    );
+    const { written } = textEncoder.encodeInto(v, this.buf.subarray(this.pos));
     this.view.setUint32(lenOffset, written!, true);
     this.pos += written!;
   }

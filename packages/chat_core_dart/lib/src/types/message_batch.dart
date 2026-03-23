@@ -1,8 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import '../_util.dart';
-import 'message.dart';
+import 'package:chat_core/src/util/list_equals.dart';
+import 'package:chat_core/src/types/message.dart';
 
 /// A batch of messages (used in SyncBatch events and LoadMessages responses).
 class MessageBatch {

@@ -1,10 +1,10 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import '../_util.dart';
-import 'message_flags.dart';
-import 'message_kind.dart';
-import 'rich_span.dart';
+import 'package:chat_core/src/util/list_equals.dart';
+import 'package:chat_core/src/types/message_flags.dart';
+import 'package:chat_core/src/types/message_kind.dart';
+import 'package:chat_core/src/types/rich_span.dart';
 
 /// A decoded message (as transmitted in `MessageBatch`).
 ///

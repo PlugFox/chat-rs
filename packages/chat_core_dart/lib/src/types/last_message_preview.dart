@@ -1,8 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'message_flags.dart';
-import 'message_kind.dart';
+import 'package:chat_core/src/types/message_flags.dart';
+import 'package:chat_core/src/types/message_kind.dart';
 
 /// Lightweight last-message preview included in `ChatEntry`.
 ///

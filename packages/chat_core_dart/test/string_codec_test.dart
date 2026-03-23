@@ -29,7 +29,10 @@ void main() {
     // ASCII
     roundtrip('empty string', '');
     roundtrip('ASCII short', 'hello');
-    roundtrip('ASCII 49 chars', 'Hello, this is a test message with some content.');
+    roundtrip(
+      'ASCII 49 chars',
+      'Hello, this is a test message with some content.',
+    );
 
     // 2-byte UTF-8 (U+0080..U+07FF)
     roundtrip('Cyrillic', 'Привет, мир!');

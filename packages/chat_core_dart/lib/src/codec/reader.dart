@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'error.dart';
+import 'package:chat_core/src/codec/error.dart';
 
 class ProtocolReader {
   ProtocolReader(Uint8List data, [this._pos = 0])

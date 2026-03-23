@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'user_flags.dart';
+import 'package:chat_core/src/types/user_flags.dart';
 
 /// A user entry as transmitted on the wire (PresenceResult, user lookups).
 ///

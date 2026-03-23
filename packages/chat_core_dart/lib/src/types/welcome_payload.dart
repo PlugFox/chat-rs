@@ -1,8 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'server_capabilities.dart';
-import 'server_limits.dart';
+import 'package:chat_core/src/types/server_capabilities.dart';
+import 'package:chat_core/src/types/server_limits.dart';
 
 /// Welcome frame payload (server → client).
 class WelcomePayload {

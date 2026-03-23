@@ -1,8 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'chat_role.dart';
-import 'permission.dart';
+import 'package:chat_core/src/types/chat_role.dart';
+import 'package:chat_core/src/types/permission.dart';
 
 /// MemberUpdated event payload (server → client).
 ///

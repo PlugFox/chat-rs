@@ -1,4 +1,7 @@
-import '../../chat_core.dart';
+// GENERATED CODE — DO NOT MODIFY BY HAND
+// Source: chat_protocol
+
+import 'package:chat_core/chat_core.dart';
 
 void encodeLastMessagePreview(ProtocolWriter w, LastMessagePreview v) {
   w.writeU32(v.id);

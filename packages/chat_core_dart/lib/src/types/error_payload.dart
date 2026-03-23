@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'error_code.dart';
+import 'package:chat_core/src/types/error_code.dart';
 
 /// Error frame payload (server → client).
 class ErrorPayload {

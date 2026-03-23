@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'platform/ws_stub.dart'
+import 'package:chat_core/src/ws/platform/ws_stub.dart'
     // ignore: uri_does_not_exist
-    if (dart.library.js_interop) 'platform/ws_js.dart'
+    if (dart.library.js_interop) 'package:chat_core/src/ws/platform/ws_js.dart'
     // ignore: uri_does_not_exist
-    if (dart.library.io) 'platform/ws_vm.dart';
+    if (dart.library.io) 'package:chat_core/src/ws/platform/ws_vm.dart';
 
-export '_disposable.dart';
+export 'package:chat_core/src/util/disposable.dart';
 
 /// {@template chat_websocket}
 /// A WebSocket transport for binary real-time communication.
@@ -31,6 +31,10 @@ abstract class ChatWebSocket {
   /// [onError] — called on transport errors *after* the connection is open.
   /// [onClose] — called exactly once when the connection ends, whether
   ///   initiated locally via [close] or by the remote peer.
+  /// [protocols] — WebSocket subprotocols for the handshake
+  ///   (e.g. protocol version negotiation).
+  /// [timeout] — maximum time to wait for the connection to establish.
+  ///   If exceeded, the future completes with a [TimeoutException].
   ///
   /// {@macro chat_websocket}
   static Future<ChatWebSocket> connect({
@@ -38,13 +42,16 @@ abstract class ChatWebSocket {
     required void Function(Uint8List message) onMessage,
     required void Function(Object error, StackTrace stackTrace) onError,
     required void Function(int code, String reason) onClose,
-  }) =>
-      $connectChatWebSocket(
-        url: url,
-        onMessage: onMessage,
-        onError: onError,
-        onClose: onClose,
-      );
+    Iterable<String>? protocols,
+    Duration? timeout,
+  }) => $connectChatWebSocket(
+    url: url,
+    onMessage: onMessage,
+    onError: onError,
+    onClose: onClose,
+    protocols: protocols,
+    timeout: timeout,
+  );
 
   /// Sends a binary message through the WebSocket connection.
   ///

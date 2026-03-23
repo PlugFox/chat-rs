@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'rich_style.dart';
+import 'package:chat_core/src/types/rich_style.dart';
 
 /// A rich text span — a styled range within the plain-text content.
 ///

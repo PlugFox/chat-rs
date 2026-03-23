@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'member_action.dart';
+import 'package:chat_core/src/types/member_action.dart';
 
 /// UpdateMember frame payload (client → server).
 ///

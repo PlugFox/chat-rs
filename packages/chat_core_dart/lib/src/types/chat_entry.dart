@@ -1,8 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'chat_kind.dart';
-import 'last_message_preview.dart';
+import 'package:chat_core/src/types/chat_kind.dart';
+import 'package:chat_core/src/types/last_message_preview.dart';
 
 /// A chat entry as transmitted on the wire (LoadChats, ChatCreated, ChatUpdated).
 class ChatEntry {

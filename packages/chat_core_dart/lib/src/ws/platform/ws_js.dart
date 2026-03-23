@@ -1,8 +1,8 @@
-import 'dart:async' show Completer;
+import 'dart:async' show Completer, TimeoutException;
 import 'dart:js_interop';
 import 'dart:typed_data';
 
-import 'package:chat_core/src/ws/_disposable.dart';
+import 'package:chat_core/src/util/disposable.dart';
 import 'package:chat_core/src/ws/ws.dart' show ChatWebSocket;
 import 'package:meta/meta.dart';
 
@@ -12,7 +12,7 @@ import 'package:meta/meta.dart';
 
 @JS('WebSocket')
 extension type _JsWebSocket._(JSObject _) implements JSObject {
-  external factory _JsWebSocket(String url);
+  external factory _JsWebSocket(String url, [JSAny? protocols]);
   external void close([int code, String reason]);
   external void send(JSAny data);
   external int get readyState;
@@ -47,6 +47,8 @@ Future<ChatWebSocket> $connectChatWebSocket({
   required void Function(Uint8List message) onMessage,
   required void Function(Object error, StackTrace stackTrace) onError,
   required void Function(int code, String reason) onClose,
+  Iterable<String>? protocols,
+  Duration? timeout,
 }) {
   final completer = Completer<ChatWebSocket>();
 
@@ -54,47 +56,61 @@ Future<ChatWebSocket> $connectChatWebSocket({
   final connectChain = DisposableChain();
 
   try {
-    ws = _JsWebSocket(url);
+    final jsProtocols =
+        protocols?.map((p) => p.toJS).toList(growable: false).toJS;
+    ws = _JsWebSocket(url, jsProtocols);
     ws.binaryType = 'arraybuffer';
   } on Object catch (e, st) {
     completer.completeError(e, st);
     return completer.future;
   }
 
-  ws.onopen = ((JSAny _) {
-    connectChain(); // tear down connect-phase handlers
-    final socket = _JsChatWebSocket(ws, onMessage, onError, onClose);
-    completer.complete(socket);
-  }).toJS;
+  ws.onopen =
+      ((JSAny _) {
+        connectChain(); // tear down connect-phase handlers
+        final socket = _JsChatWebSocket(ws, onMessage, onError, onClose);
+        completer.complete(socket);
+      }).toJS;
   connectChain.add(() => ws.onopen = null);
 
-  ws.onerror = ((JSAny _) {
-    if (completer.isCompleted) return;
-    connectChain();
-    try {
-      ws.close();
-    } on Object catch (_) {}
-    completer.completeError(
-      Exception('WebSocket connection failed'),
-      StackTrace.current,
-    );
-  }).toJS;
+  ws.onerror =
+      ((JSAny _) {
+        if (completer.isCompleted) return;
+        connectChain();
+        try {
+          ws.close();
+        } on Object catch (_) {}
+        completer.completeError(
+          Exception('WebSocket connection failed'),
+          StackTrace.current,
+        );
+      }).toJS;
   connectChain.add(() => ws.onerror = null);
 
-  ws.onclose = ((JSAny event) {
-    if (completer.isCompleted) return;
-    connectChain();
-    final ce = event as _JsCloseEvent;
-    completer.completeError(
-      Exception(
-        'WebSocket closed during connect: ${ce.code} ${ce.reason}',
-      ),
-      StackTrace.current,
-    );
-  }).toJS;
+  ws.onclose =
+      ((JSAny event) {
+        if (completer.isCompleted) return;
+        connectChain();
+        final ce = event as _JsCloseEvent;
+        completer.completeError(
+          Exception('WebSocket closed during connect: ${ce.code} ${ce.reason}'),
+          StackTrace.current,
+        );
+      }).toJS;
   connectChain.add(() => ws.onclose = null);
 
-  return completer.future;
+  final future = completer.future;
+  if (timeout == null) return future;
+  return future.timeout(
+    timeout,
+    onTimeout: () {
+      connectChain();
+      try {
+        ws.close();
+      } on Object catch (_) {}
+      throw TimeoutException('WebSocket connection timed out', timeout);
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -102,34 +118,32 @@ Future<ChatWebSocket> $connectChatWebSocket({
 // ---------------------------------------------------------------------------
 
 final class _JsChatWebSocket implements ChatWebSocket {
-  _JsChatWebSocket(
-    this._ws,
-    this._onMessage,
-    this._onError,
-    this._onClose,
-  ) {
-    _ws.onmessage = ((JSAny event) {
-      final data = (event as _JsMessageEvent).data;
-      if (data != null && data.isA<JSArrayBuffer>()) {
-        _onMessage((data as JSArrayBuffer).toDart.asUint8List());
-      }
-    }).toJS;
+  _JsChatWebSocket(this._ws, this._onMessage, this._onError, this._onClose) {
+    _ws.onmessage =
+        ((JSAny event) {
+          final data = (event as _JsMessageEvent).data;
+          if (data != null && data.isA<JSArrayBuffer>()) {
+            _onMessage((data as JSArrayBuffer).toDart.asUint8List());
+          }
+        }).toJS;
     _chain.add(() => _ws.onmessage = null);
 
-    _ws.onerror = ((JSAny _) {
-      _onError(Exception('WebSocket error'), StackTrace.current);
-    }).toJS;
+    _ws.onerror =
+        ((JSAny _) {
+          _onError(Exception('WebSocket error'), StackTrace.current);
+        }).toJS;
     _chain.add(() => _ws.onerror = null);
 
-    _ws.onclose = ((JSAny event) {
-      if (_closed) return;
-      _closed = true;
-      final ce = event as _JsCloseEvent;
-      final code = ce.code;
-      final reason = ce.reason;
-      _chain();
-      _onClose(code, reason.isEmpty ? 'closed' : reason);
-    }).toJS;
+    _ws.onclose =
+        ((JSAny event) {
+          if (_closed) return;
+          _closed = true;
+          final ce = event as _JsCloseEvent;
+          final code = ce.code;
+          final reason = ce.reason;
+          _chain();
+          _onClose(code, reason.isEmpty ? 'closed' : reason);
+        }).toJS;
     _chain.add(() => _ws.onclose = null);
   }
 

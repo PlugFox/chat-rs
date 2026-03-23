@@ -1,7 +1,7 @@
 import 'dart:io' as io;
 import 'dart:typed_data';
 
-import 'package:chat_core/src/ws/_disposable.dart';
+import 'package:chat_core/src/util/disposable.dart';
 import 'package:chat_core/src/ws/ws.dart' show ChatWebSocket;
 import 'package:meta/meta.dart';
 
@@ -11,8 +11,14 @@ Future<ChatWebSocket> $connectChatWebSocket({
   required void Function(Uint8List message) onMessage,
   required void Function(Object error, StackTrace stackTrace) onError,
   required void Function(int code, String reason) onClose,
+  Iterable<String>? protocols,
+  Duration? timeout,
 }) async {
-  final socket = await io.WebSocket.connect(url);
+  var future = io.WebSocket.connect(url, protocols: protocols);
+  if (timeout != null) future = future.timeout(timeout);
+  final socket =
+      await future
+        ..pingInterval = null;
   return _VmChatWebSocket(socket, onMessage, onError, onClose);
 }
 
@@ -40,10 +46,7 @@ final class _VmChatWebSocket implements ChatWebSocket {
         final code = _socket.closeCode ?? 1005;
         final reason = _socket.closeReason;
         _chain();
-        _onClose(
-          code,
-          (reason == null || reason.isEmpty) ? 'closed' : reason,
-        );
+        _onClose(code, (reason == null || reason.isEmpty) ? 'closed' : reason);
       },
     );
     _chain.add(() => sub.cancel());

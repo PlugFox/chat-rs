@@ -1,6 +1,9 @@
+// GENERATED CODE — DO NOT MODIFY BY HAND
+// Source: chat_protocol
+
 import 'dart:typed_data';
 
-import '../../chat_core.dart';
+import 'package:chat_core/chat_core.dart';
 
 class FrameHeader {
   const FrameHeader({

@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'load_direction.dart';
+import 'package:chat_core/src/types/load_direction.dart';
 
 /// LoadMessages frame payload (client → server).
 ///

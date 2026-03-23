@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'error.dart';
+import 'package:chat_core/src/codec/error.dart';
 
 class ProtocolWriter {
   ProtocolWriter([int initialCapacity = 256])

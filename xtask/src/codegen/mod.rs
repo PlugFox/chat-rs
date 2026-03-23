@@ -196,7 +196,7 @@ const SCAFFOLDING: &[&str] = &[
     "error.ts",
     "reader.ts",
     "writer.ts",
-    "_util.dart",
+    "list_equals.dart",
 ];
 
 /// Recursively compare files in `gen_dir` against `existing_dir`.

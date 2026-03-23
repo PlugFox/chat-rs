@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import '../_util.dart';
+import 'package:chat_core/src/util/list_equals.dart';
 
 /// InviteMembers frame payload (client → server).
 class InviteMembersPayload {

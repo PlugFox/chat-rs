@@ -3,7 +3,7 @@
 
 import 'dart:typed_data';
 
-import '../_util.dart';
+import 'package:chat_core/src/util/list_equals.dart';
 
 /// Ack payload — command-specific response data.
 ///

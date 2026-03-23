@@ -3,8 +3,8 @@
 
 import 'dart:typed_data';
 
-import '../_util.dart';
-import 'message_kind.dart';
+import 'package:chat_core/src/util/list_equals.dart';
+import 'package:chat_core/src/types/message_kind.dart';
 
 /// SendMessage frame payload (client → server).
 class SendMessagePayload {

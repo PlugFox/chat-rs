@@ -1,6 +1,3 @@
-// GENERATED CODE — DO NOT MODIFY BY HAND
-// Source: chat_protocol
-
 /// Deep equality check for lists.
 bool listEquals<T>(List<T>? a, List<T>? b) {
   if (identical(a, b)) return true;

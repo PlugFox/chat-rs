@@ -1,7 +1,7 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
-import 'presence_status.dart';
+import 'package:chat_core/src/types/presence_status.dart';
 
 /// A presence entry as transmitted in `PresenceResult` (13 bytes fixed).
 class PresenceEntry {

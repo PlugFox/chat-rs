@@ -11,6 +11,9 @@ use crate::codegen::ir::*;
 
 const HEADER: &str = "// GENERATED CODE — DO NOT MODIFY BY HAND\n// Source: chat_protocol\n";
 
+/// Dart package name — used for `package:` imports in generated code.
+const PKG: &str = "package:chat_core";
+
 /// ErrorCode variants that are permanent (do not retry).
 const PERMANENT_ERRORS: &[&str] = &[
     "Forbidden",
@@ -52,12 +55,15 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
     write_if_missing(&codec_dir.join("reader.dart"), &emit_reader_dart())?;
     write_if_missing(&codec_dir.join("writer.dart"), &emit_writer_dart())?;
 
+    let util_dir = output_dir.join("lib/src/util");
+    fs::create_dir_all(&util_dir).context("creating util dir")?;
+
     let needs_util = ir
         .structs
         .iter()
         .any(|s| s.fields.iter().any(|f| is_list_type(&f.ty)));
     if needs_util {
-        write_if_missing(&src_dir.join("_util.dart"), &emit_util())?;
+        write_if_missing(&util_dir.join("list_equals.dart"), &emit_util())?;
     }
 
     // -- Generated from IR (always overwritten) -------------------------------
@@ -304,8 +310,8 @@ fn emit_import_block(
     has_util: bool,
     type_refs: &BTreeSet<String>,
 ) {
-    let has_relative = has_util || !type_refs.is_empty();
-    if !has_typed_data && !has_relative {
+    let has_pkg = has_util || !type_refs.is_empty();
+    if !has_typed_data && !has_pkg {
         return;
     }
 
@@ -313,16 +319,16 @@ fn emit_import_block(
 
     if has_typed_data {
         out.push_str("import 'dart:typed_data';\n");
-        if has_relative {
+        if has_pkg {
             out.push('\n');
         }
     }
 
     if has_util {
-        out.push_str("import '../_util.dart';\n");
+        writeln!(out, "import '{PKG}/src/util/list_equals.dart';").unwrap();
     }
     for r in type_refs {
-        writeln!(out, "import '{}.dart';", to_snake_case(r)).unwrap();
+        writeln!(out, "import '{PKG}/src/types/{}.dart';", to_snake_case(r)).unwrap();
     }
 }
 
@@ -871,7 +877,7 @@ fn emit_barrel(exports: &[String]) -> String {
     out.push_str("\n/// Chat protocol types and binary codec.\nlibrary;\n\n");
 
     for export in exports {
-        writeln!(out, "export '{export}';").unwrap();
+        writeln!(out, "export '{PKG}/{export}';").unwrap();
     }
 
     out
@@ -1312,7 +1318,7 @@ fn dart_emit_load_messages_codec(out: &mut String, t: &TaggedEnumDef, ir: &Parse
 fn emit_codecs_dart(ir: &ParsedModule) -> String {
     let mut out = String::from(HEADER);
     // Import barrel (provides all types + codec utilities)
-    out.push_str("\nimport '../../chat_core.dart';\n\n");
+    out.push_str("\nimport 'package:chat_core/chat_core.dart';\n\n");
 
     // Struct codecs
     for s in &ir.structs {
@@ -1348,7 +1354,7 @@ fn emit_codecs_dart(ir: &ParsedModule) -> String {
 fn emit_frame_codec_dart(ir: &ParsedModule) -> String {
     let mut out = String::from(HEADER);
     out.push_str("\nimport 'dart:typed_data';\n\n");
-    out.push_str("import '../../chat_core.dart';\n\n");
+    out.push_str("import 'package:chat_core/chat_core.dart';\n\n");
 
     // FrameHeader class
     out.push_str(

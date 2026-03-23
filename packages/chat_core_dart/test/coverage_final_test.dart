@@ -137,6 +137,13 @@ void main() {
       expect(identical(a, a), isTrue);
       expect(a, equals(a));
     });
+
+    test('AckChatId hashCode consistent', () {
+      final a = AckChatId(value: 42);
+      final b = AckChatId(value: 42);
+      expect(a.hashCode, b.hashCode);
+      expect({a}.contains(b), isTrue);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -193,6 +200,7 @@ void main() {
 
       test('unknown LoadMessagesPayload mode throws', () {
         final w = ProtocolWriter();
+        w.writeU32(1); // chatId
         w.writeU8(99); // invalid mode
         expect(
           () => decodeLoadMessagesPayload(ProtocolReader(w.toBytes())),

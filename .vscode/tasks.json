@@ -628,7 +628,7 @@
             "label": "dart:test:coverage",
             "detail": "Run Dart tests with coverage (VM)",
             "type": "shell",
-            "command": "dart test --coverage=coverage && dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib && lcov --summary coverage/lcov.info",
+            "command": "dart test --coverage=coverage && dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib --check-ignore && lcov --summary coverage/lcov.info",
             "options": {
                 "cwd": "${workspaceFolder}/packages/chat_core_dart"
             },

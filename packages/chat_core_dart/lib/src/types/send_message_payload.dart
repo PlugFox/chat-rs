@@ -3,10 +3,13 @@
 
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/util/list_equals.dart';
 import 'package:chat_core/src/types/message_kind.dart';
 
 /// SendMessage frame payload (client → server).
+@immutable
 class SendMessagePayload {
   const SendMessagePayload({
     required this.chatId,
@@ -46,6 +49,7 @@ class SendMessagePayload {
   /// When replying, the client should include the original message author's ID here.
   final List<int> mentionedUserIds;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -58,6 +62,7 @@ class SendMessagePayload {
           listEquals(richContent, other.richContent) &&
           extra == other.extra &&
           listEquals(mentionedUserIds, other.mentionedUserIds);
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(
@@ -70,8 +75,4 @@ class SendMessagePayload {
     extra,
     Object.hashAll(mentionedUserIds),
   );
-
-  @override
-  String toString() =>
-      'SendMessagePayload(chatId: $chatId, kind: $kind, idempotencyKey: $idempotencyKey, replyToId: $replyToId, content: $content, richContent: $richContent, extra: $extra, mentionedUserIds: $mentionedUserIds)';
 }

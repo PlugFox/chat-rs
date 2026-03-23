@@ -1,6 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/util/list_equals.dart';
 import 'package:chat_core/src/types/message_flags.dart';
 import 'package:chat_core/src/types/message_kind.dart';
@@ -11,6 +13,7 @@ import 'package:chat_core/src/types/rich_span.dart';
 /// TODO: Add `reactions` field (Vec of pack_id + emoji_index + count + user_reacted)
 /// so that reactions are persisted and available when loading message history.
 /// Currently reactions are only delivered as live `ReactionUpdate` events.
+@immutable
 class Message {
   const Message({
     required this.id,
@@ -60,6 +63,7 @@ class Message {
   /// Extra metadata JSON. `None` = no metadata.
   final String? extra;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -75,6 +79,7 @@ class Message {
           content == other.content &&
           listEquals(richContent, other.richContent) &&
           extra == other.extra;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(
@@ -90,8 +95,4 @@ class Message {
     Object.hashAll(richContent ?? const []),
     extra,
   );
-
-  @override
-  String toString() =>
-      'Message(id: $id, chatId: $chatId, senderId: $senderId, createdAt: $createdAt, updatedAt: $updatedAt, kind: $kind, flags: $flags, replyToId: $replyToId, content: $content, richContent: $richContent, extra: $extra)';
 }

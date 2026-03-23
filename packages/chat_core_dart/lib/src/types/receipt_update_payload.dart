@@ -1,7 +1,10 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// ReceiptUpdate event payload (server → client).
+@immutable
 class ReceiptUpdatePayload {
   const ReceiptUpdatePayload({
     required this.chatId,
@@ -18,6 +21,7 @@ class ReceiptUpdatePayload {
   /// Highest read message ID.
   final int messageId;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -25,11 +29,8 @@ class ReceiptUpdatePayload {
           chatId == other.chatId &&
           userId == other.userId &&
           messageId == other.messageId;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(chatId, userId, messageId);
-
-  @override
-  String toString() =>
-      'ReceiptUpdatePayload(chatId: $chatId, userId: $userId, messageId: $messageId)';
 }

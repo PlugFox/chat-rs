@@ -3,8 +3,11 @@
 
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/chat_core.dart';
 
+@immutable
 class FrameHeader {
   const FrameHeader({
     required this.kind,
@@ -16,6 +19,7 @@ class FrameHeader {
   final int eventSeq;
 }
 
+@immutable
 sealed class FramePayload {
   const FramePayload();
 }
@@ -283,6 +287,7 @@ class FramePayloadGetBlockList extends FramePayload {
   final GetBlockListPayload data;
 }
 
+@immutable
 class Frame {
   const Frame({
     required this.seq,

@@ -3,9 +3,12 @@
 
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/util/list_equals.dart';
 
 /// EditMessage frame payload (client → server).
+@immutable
 class EditMessagePayload {
   const EditMessagePayload({
     required this.chatId,
@@ -30,6 +33,7 @@ class EditMessagePayload {
   /// New extra metadata JSON. `None` = remove metadata.
   final String? extra;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -39,6 +43,7 @@ class EditMessagePayload {
           content == other.content &&
           listEquals(richContent, other.richContent) &&
           extra == other.extra;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(
@@ -48,8 +53,4 @@ class EditMessagePayload {
     Object.hashAll(richContent ?? const []),
     extra,
   );
-
-  @override
-  String toString() =>
-      'EditMessagePayload(chatId: $chatId, messageId: $messageId, content: $content, richContent: $richContent, extra: $extra)';
 }

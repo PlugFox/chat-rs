@@ -1,9 +1,12 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// Server-enforced limits sent in the Welcome payload.
 ///
 /// Clients use these for local enforcement (debouncing, UI limits).
+@immutable
 class ServerLimits {
   const ServerLimits({
     required this.pingIntervalMs,
@@ -36,6 +39,7 @@ class ServerLimits {
   /// Rate limit: concurrent connections per IP.
   final int connectionsPerIp;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -47,6 +51,7 @@ class ServerLimits {
           maxFrameSize == other.maxFrameSize &&
           messagesPerSec == other.messagesPerSec &&
           connectionsPerIp == other.connectionsPerIp;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(
@@ -58,8 +63,4 @@ class ServerLimits {
     messagesPerSec,
     connectionsPerIp,
   );
-
-  @override
-  String toString() =>
-      'ServerLimits(pingIntervalMs: $pingIntervalMs, pingTimeoutMs: $pingTimeoutMs, maxMessageSize: $maxMessageSize, maxExtraSize: $maxExtraSize, maxFrameSize: $maxFrameSize, messagesPerSec: $messagesPerSec, connectionsPerIp: $connectionsPerIp)';
 }

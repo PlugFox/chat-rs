@@ -1,11 +1,14 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/types/user_flags.dart';
 
 /// A user entry as transmitted on the wire (PresenceResult, user lookups).
 ///
 /// Wire format: 22-byte fixed header + 4 length-prefixed optional strings.
+@immutable
 class UserEntry {
   const UserEntry({
     required this.id,
@@ -42,6 +45,7 @@ class UserEntry {
   /// Avatar URL. `None` when not set.
   final String? avatarUrl;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -54,6 +58,7 @@ class UserEntry {
           firstName == other.firstName &&
           lastName == other.lastName &&
           avatarUrl == other.avatarUrl;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(
@@ -66,8 +71,4 @@ class UserEntry {
     lastName,
     avatarUrl,
   );
-
-  @override
-  String toString() =>
-      'UserEntry(id: $id, flags: $flags, createdAt: $createdAt, updatedAt: $updatedAt, username: $username, firstName: $firstName, lastName: $lastName, avatarUrl: $avatarUrl)';
 }

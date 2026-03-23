@@ -16,9 +16,6 @@ void main() {
   tearDownAll(() => server.stop());
 
   group('ChatWebSocket (VM)', () {
-    wsTests(
-      echoPort: () => server.port,
-      hangPort: () => server.hangPort,
-    );
+    wsTests(echoPort: () => server.port, hangPort: () => server.hangPort);
   });
 }

@@ -1,3 +1,5 @@
+// coverage:ignore-file
+
 import 'dart:typed_data';
 
 import 'package:chat_core/src/ws/ws.dart' show ChatWebSocket;

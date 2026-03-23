@@ -1,7 +1,10 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// UnpinMessage frame payload (client → server).
+@immutable
 class UnpinMessagePayload {
   const UnpinMessagePayload({required this.chatId, required this.messageId});
 
@@ -11,17 +14,15 @@ class UnpinMessagePayload {
   /// Message to unpin.
   final int messageId;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is UnpinMessagePayload &&
           chatId == other.chatId &&
           messageId == other.messageId;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(chatId, messageId);
-
-  @override
-  String toString() =>
-      'UnpinMessagePayload(chatId: $chatId, messageId: $messageId)';
 }

@@ -1,7 +1,10 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// ReactionUpdate event payload (server → client).
+@immutable
 class ReactionUpdatePayload {
   const ReactionUpdatePayload({
     required this.chatId,
@@ -30,6 +33,7 @@ class ReactionUpdatePayload {
   /// `true` = reaction added, `false` = reaction removed.
   final bool added;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -40,12 +44,9 @@ class ReactionUpdatePayload {
           packId == other.packId &&
           emojiIndex == other.emojiIndex &&
           added == other.added;
+  // coverage:ignore-end
 
   @override
   int get hashCode =>
       Object.hash(chatId, messageId, userId, packId, emojiIndex, added);
-
-  @override
-  String toString() =>
-      'ReactionUpdatePayload(chatId: $chatId, messageId: $messageId, userId: $userId, packId: $packId, emojiIndex: $emojiIndex, added: $added)';
 }

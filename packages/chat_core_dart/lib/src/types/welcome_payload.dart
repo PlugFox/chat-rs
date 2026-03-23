@@ -1,10 +1,13 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/types/server_capabilities.dart';
 import 'package:chat_core/src/types/server_limits.dart';
 
 /// Welcome frame payload (server → client).
+@immutable
 class WelcomePayload {
   const WelcomePayload({
     required this.sessionId,
@@ -29,6 +32,7 @@ class WelcomePayload {
   /// Server-advertised feature capabilities.
   final ServerCapabilities capabilities;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -38,12 +42,9 @@ class WelcomePayload {
           userId == other.userId &&
           limits == other.limits &&
           capabilities == other.capabilities;
+  // coverage:ignore-end
 
   @override
   int get hashCode =>
       Object.hash(sessionId, serverTime, userId, limits, capabilities);
-
-  @override
-  String toString() =>
-      'WelcomePayload(sessionId: $sessionId, serverTime: $serverTime, userId: $userId, limits: $limits, capabilities: $capabilities)';
 }

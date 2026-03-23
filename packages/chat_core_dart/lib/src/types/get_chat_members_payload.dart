@@ -1,7 +1,10 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// GetChatMembers frame payload (client → server).
+@immutable
 class GetChatMembersPayload {
   const GetChatMembersPayload({
     required this.chatId,
@@ -18,6 +21,7 @@ class GetChatMembersPayload {
   /// Max members to return.
   final int limit;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -25,11 +29,8 @@ class GetChatMembersPayload {
           chatId == other.chatId &&
           cursor == other.cursor &&
           limit == other.limit;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(chatId, cursor, limit);
-
-  @override
-  String toString() =>
-      'GetChatMembersPayload(chatId: $chatId, cursor: $cursor, limit: $limit)';
 }

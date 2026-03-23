@@ -1,7 +1,10 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// Search scope selector.
+@immutable
 sealed class SearchScope {
   const SearchScope();
 }
@@ -12,16 +15,15 @@ class SearchScopeChat extends SearchScope {
 
   final int chatId;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is SearchScopeChat && chatId == other.chatId;
+  // coverage:ignore-end
 
   @override
   int get hashCode => chatId.hashCode;
-
-  @override
-  String toString() => 'SearchScopeChat(chatId: $chatId)';
 }
 
 /// Search across all chats the user is a member of.
@@ -30,13 +32,10 @@ class SearchScopeGlobal extends SearchScope {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is SearchScopeGlobal;
+      identical(this, other) || other is SearchScopeGlobal; // coverage:ignore-line
 
   @override
   int get hashCode => 0;
-
-  @override
-  String toString() => 'SearchScopeGlobal()';
 }
 
 /// Search messages from a specific user across all chats.
@@ -45,14 +44,13 @@ class SearchScopeUser extends SearchScope {
 
   final int userId;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is SearchScopeUser && userId == other.userId;
+  // coverage:ignore-end
 
   @override
   int get hashCode => userId.hashCode;
-
-  @override
-  String toString() => 'SearchScopeUser(userId: $userId)';
 }

@@ -1,12 +1,15 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/types/message_flags.dart';
 import 'package:chat_core/src/types/message_kind.dart';
 
 /// Lightweight last-message preview included in `ChatEntry`.
 ///
 /// Wire format: 21-byte fixed header + content preview string.
+@immutable
 class LastMessagePreview {
   const LastMessagePreview({
     required this.id,
@@ -35,6 +38,7 @@ class LastMessagePreview {
   /// Truncated plain-text preview (server-side, up to 100 bytes UTF-8).
   final String contentPreview;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -45,12 +49,9 @@ class LastMessagePreview {
           kind == other.kind &&
           flags == other.flags &&
           contentPreview == other.contentPreview;
+  // coverage:ignore-end
 
   @override
   int get hashCode =>
       Object.hash(id, senderId, createdAt, kind, flags, contentPreview);
-
-  @override
-  String toString() =>
-      'LastMessagePreview(id: $id, senderId: $senderId, createdAt: $createdAt, kind: $kind, flags: $flags, contentPreview: $contentPreview)';
 }

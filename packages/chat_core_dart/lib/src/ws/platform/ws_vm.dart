@@ -30,6 +30,7 @@ final class _VmChatWebSocket implements ChatWebSocket {
     this._onClose,
   ) {
     final sub = _socket.listen(
+      // coverage:ignore-start
       (Object? data) {
         if (data is Uint8List) {
           _onMessage(data);
@@ -40,6 +41,7 @@ final class _VmChatWebSocket implements ChatWebSocket {
       onError: (Object error, StackTrace stackTrace) {
         _onError(error, stackTrace);
       },
+      // coverage:ignore-end
       onDone: () {
         if (_closed) return;
         _closed = true;

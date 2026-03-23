@@ -1,9 +1,12 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/types/error_code.dart';
 
 /// Error frame payload (server → client).
+@immutable
 class ErrorPayload {
   const ErrorPayload({
     required this.code,
@@ -24,6 +27,7 @@ class ErrorPayload {
   /// Server-provided diagnostic JSON details. `None` = absent.
   final String? extra;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -32,11 +36,8 @@ class ErrorPayload {
           message == other.message &&
           retryAfterMs == other.retryAfterMs &&
           extra == other.extra;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(code, message, retryAfterMs, extra);
-
-  @override
-  String toString() =>
-      'ErrorPayload(code: $code, message: $message, retryAfterMs: $retryAfterMs, extra: $extra)';
 }

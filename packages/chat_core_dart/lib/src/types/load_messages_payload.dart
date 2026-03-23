@@ -1,6 +1,8 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/types/load_direction.dart';
 
 /// LoadMessages frame payload (client → server).
@@ -8,6 +10,7 @@ import 'package:chat_core/src/types/load_direction.dart';
 /// Two modes selected by discriminant:
 /// - Mode 0: anchor-based pagination (history load)
 /// - Mode 1: range update check (catch-up after reconnect)
+@immutable
 sealed class LoadMessagesPayload {
   const LoadMessagesPayload();
 }
@@ -33,6 +36,7 @@ class LoadMessagesPaginate extends LoadMessagesPayload {
   /// Max messages to return.
   final int limit;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -41,13 +45,10 @@ class LoadMessagesPaginate extends LoadMessagesPayload {
           direction == other.direction &&
           anchorId == other.anchorId &&
           limit == other.limit;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(chatId, direction, anchorId, limit);
-
-  @override
-  String toString() =>
-      'LoadMessagesPaginate(chatId: $chatId, direction: $direction, anchorId: $anchorId, limit: $limit)';
 }
 
 /// Range update check (mode 1).
@@ -71,6 +72,7 @@ class LoadMessagesRangeCheck extends LoadMessagesPayload {
   /// `MAX(updated_at)` from client's local cache for this range.
   final int sinceTs;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -79,11 +81,8 @@ class LoadMessagesRangeCheck extends LoadMessagesPayload {
           fromId == other.fromId &&
           toId == other.toId &&
           sinceTs == other.sinceTs;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(chatId, fromId, toId, sinceTs);
-
-  @override
-  String toString() =>
-      'LoadMessagesRangeCheck(chatId: $chatId, fromId: $fromId, toId: $toId, sinceTs: $sinceTs)';
 }

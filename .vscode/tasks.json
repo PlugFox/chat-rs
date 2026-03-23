@@ -44,13 +44,17 @@
             "detail": "Run cargo check on workspace",
             "type": "cargo",
             "command": "check",
-            "args": ["--workspace"],
+            "args": [
+                "--workspace"
+            ],
             "icon": {
                 "id": "check",
                 "color": "terminal.ansiGreen"
             },
             "group": "build",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -62,13 +66,18 @@
             "detail": "Run cargo check on a specific crate",
             "type": "cargo",
             "command": "check",
-            "args": ["-p", "${input:crate}"],
+            "args": [
+                "-p",
+                "${input:crate}"
+            ],
             "icon": {
                 "id": "check",
                 "color": "terminal.ansiGreen"
             },
             "group": "build",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -80,13 +89,21 @@
             "detail": "Run clippy with deny warnings on workspace",
             "type": "cargo",
             "command": "clippy",
-            "args": ["--workspace", "--all-targets", "--", "-D", "warnings"],
+            "args": [
+                "--workspace",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings"
+            ],
             "icon": {
                 "id": "eye",
                 "color": "terminal.ansiYellow"
             },
             "group": "build",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -98,13 +115,22 @@
             "detail": "Run clippy on a specific crate",
             "type": "cargo",
             "command": "clippy",
-            "args": ["-p", "${input:crate}", "--all-targets", "--", "-D", "warnings"],
+            "args": [
+                "-p",
+                "${input:crate}",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings"
+            ],
             "icon": {
                 "id": "eye",
                 "color": "terminal.ansiYellow"
             },
             "group": "build",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -116,7 +142,9 @@
             "detail": "Format all Rust code",
             "type": "cargo",
             "command": "fmt",
-            "args": ["--all"],
+            "args": [
+                "--all"
+            ],
             "icon": {
                 "id": "whitespace",
                 "color": "terminal.ansiBlue"
@@ -133,7 +161,10 @@
             "detail": "Check formatting without applying changes",
             "type": "cargo",
             "command": "fmt",
-            "args": ["--all", "--check"],
+            "args": [
+                "--all",
+                "--check"
+            ],
             "icon": {
                 "id": "whitespace",
                 "color": "terminal.ansiBlue"
@@ -151,7 +182,9 @@
             "detail": "Build entire workspace (debug)",
             "type": "cargo",
             "command": "build",
-            "args": ["--workspace"],
+            "args": [
+                "--workspace"
+            ],
             "icon": {
                 "id": "tools",
                 "color": "terminal.ansiCyan"
@@ -160,7 +193,9 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -172,13 +207,18 @@
             "detail": "Build a specific crate (debug)",
             "type": "cargo",
             "command": "build",
-            "args": ["-p", "${input:crate}"],
+            "args": [
+                "-p",
+                "${input:crate}"
+            ],
             "icon": {
                 "id": "tools",
                 "color": "terminal.ansiCyan"
             },
             "group": "build",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -190,13 +230,18 @@
             "detail": "Build entire workspace (release)",
             "type": "cargo",
             "command": "build",
-            "args": ["--workspace", "--release"],
+            "args": [
+                "--workspace",
+                "--release"
+            ],
             "icon": {
                 "id": "package",
                 "color": "terminal.ansiGreen"
             },
             "group": "build",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -208,13 +253,19 @@
             "detail": "Build chat-server release binary",
             "type": "cargo",
             "command": "build",
-            "args": ["-p", "chat_server", "--release"],
+            "args": [
+                "-p",
+                "chat_server",
+                "--release"
+            ],
             "icon": {
                 "id": "server",
                 "color": "terminal.ansiGreen"
             },
             "group": "build",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -227,7 +278,9 @@
             "detail": "Run all tests in workspace",
             "type": "cargo",
             "command": "test",
-            "args": ["--workspace"],
+            "args": [
+                "--workspace"
+            ],
             "icon": {
                 "id": "beaker",
                 "color": "terminal.ansiMagenta"
@@ -236,7 +289,9 @@
                 "kind": "test",
                 "isDefault": true
             },
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -248,13 +303,18 @@
             "detail": "Run tests for a specific crate",
             "type": "cargo",
             "command": "test",
-            "args": ["-p", "${input:crate}"],
+            "args": [
+                "-p",
+                "${input:crate}"
+            ],
             "icon": {
                 "id": "beaker",
                 "color": "terminal.ansiMagenta"
             },
             "group": "test",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -266,13 +326,19 @@
             "detail": "Run tests matching a name filter",
             "type": "cargo",
             "command": "test",
-            "args": ["${input:crateOrAll}", "--", "${input:testFilter}"],
+            "args": [
+                "${input:crateOrAll}",
+                "--",
+                "${input:testFilter}"
+            ],
             "icon": {
                 "id": "filter",
                 "color": "terminal.ansiMagenta"
             },
             "group": "test",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -284,13 +350,20 @@
             "detail": "Run tests with stdout/stderr visible",
             "type": "cargo",
             "command": "test",
-            "args": ["${input:crateOrAll}", "--", "--nocapture", "${input:testFilter}"],
+            "args": [
+                "${input:crateOrAll}",
+                "--",
+                "--nocapture",
+                "${input:testFilter}"
+            ],
             "icon": {
                 "id": "output",
                 "color": "terminal.ansiMagenta"
             },
             "group": "test",
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -303,12 +376,19 @@
             "detail": "Run fmt check + clippy + tests via xtask",
             "type": "cargo",
             "command": "run",
-            "args": ["-p", "xtask", "--", "check"],
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "check"
+            ],
             "icon": {
                 "id": "checklist",
                 "color": "terminal.ansiGreen"
             },
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -320,7 +400,12 @@
             "detail": "Format workspace via xtask",
             "type": "cargo",
             "command": "run",
-            "args": ["-p", "xtask", "--", "fmt"],
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "fmt"
+            ],
             "icon": {
                 "id": "whitespace",
                 "color": "terminal.ansiBlue"
@@ -337,12 +422,19 @@
             "detail": "Run all tests via xtask",
             "type": "cargo",
             "command": "run",
-            "args": ["-p", "xtask", "--", "test"],
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "test"
+            ],
             "icon": {
                 "id": "beaker",
                 "color": "terminal.ansiMagenta"
             },
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -355,12 +447,17 @@
             "detail": "Run chat-server (debug)",
             "type": "cargo",
             "command": "run",
-            "args": ["-p", "chat_server"],
+            "args": [
+                "-p",
+                "chat_server"
+            ],
             "icon": {
                 "id": "server",
                 "color": "terminal.ansiCyan"
             },
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
@@ -373,12 +470,18 @@
             "detail": "Run chat-server (release)",
             "type": "cargo",
             "command": "run",
-            "args": ["-p", "chat_server", "--release"],
+            "args": [
+                "-p",
+                "chat_server",
+                "--release"
+            ],
             "icon": {
                 "id": "server",
                 "color": "terminal.ansiGreen"
             },
-            "problemMatcher": ["$rustc"],
+            "problemMatcher": [
+                "$rustc"
+            ],
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",
@@ -392,7 +495,11 @@
             "detail": "Generate and open workspace documentation",
             "type": "cargo",
             "command": "doc",
-            "args": ["--workspace", "--no-deps", "--open"],
+            "args": [
+                "--workspace",
+                "--no-deps",
+                "--open"
+            ],
             "icon": {
                 "id": "book",
                 "color": "terminal.ansiBlue"
@@ -409,11 +516,127 @@
             "detail": "Show dependency tree for a crate",
             "type": "cargo",
             "command": "tree",
-            "args": ["-p", "${input:crate}", "--depth", "2"],
+            "args": [
+                "-p",
+                "${input:crate}",
+                "--depth",
+                "2"
+            ],
             "icon": {
                 "id": "list-tree",
                 "color": "terminal.ansiCyan"
             },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        // ── Codegen ───────────────────────────────────────────
+        {
+            "label": "xtask:codegen",
+            "detail": "Generate Dart & TypeScript from chat_protocol",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "codegen"
+            ],
+            "icon": {
+                "id": "symbol-event",
+                "color": "terminal.ansiYellow"
+            },
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "xtask:codegen:check",
+            "detail": "Verify generated code is up to date (CI mode)",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "codegen",
+                "--check"
+            ],
+            "icon": {
+                "id": "symbol-event",
+                "color": "terminal.ansiGreen"
+            },
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        // ── Dart ──────────────────────────────────────────────
+        {
+            "label": "dart:test",
+            "detail": "Run all Dart tests (VM)",
+            "type": "shell",
+            "command": "dart test",
+            "options": {
+                "cwd": "${workspaceFolder}/packages/chat_core_dart"
+            },
+            "icon": {
+                "id": "beaker",
+                "color": "terminal.ansiBlue"
+            },
+            "group": "test",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "dart:test:js",
+            "detail": "Run all Dart tests (JS/Node)",
+            "type": "shell",
+            "command": "dart test -p node",
+            "options": {
+                "cwd": "${workspaceFolder}/packages/chat_core_dart"
+            },
+            "icon": {
+                "id": "beaker",
+                "color": "terminal.ansiYellow"
+            },
+            "group": "test",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "dart:test:coverage",
+            "detail": "Run Dart tests with coverage (VM)",
+            "type": "shell",
+            "command": "dart test --coverage=coverage && dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib && lcov --summary coverage/lcov.info",
+            "options": {
+                "cwd": "${workspaceFolder}/packages/chat_core_dart"
+            },
+            "icon": {
+                "id": "graph",
+                "color": "terminal.ansiGreen"
+            },
+            "group": "test",
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",

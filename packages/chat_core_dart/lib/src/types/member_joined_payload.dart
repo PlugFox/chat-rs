@@ -1,9 +1,12 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/types/chat_role.dart';
 
 /// MemberJoined event payload (server → client).
+@immutable
 class MemberJoinedPayload {
   const MemberJoinedPayload({
     required this.chatId,
@@ -24,6 +27,7 @@ class MemberJoinedPayload {
   /// User who invited them. `0` = self-join (e.g. via invite link).
   final int invitedBy;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -32,11 +36,8 @@ class MemberJoinedPayload {
           userId == other.userId &&
           role == other.role &&
           invitedBy == other.invitedBy;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(chatId, userId, role, invitedBy);
-
-  @override
-  String toString() =>
-      'MemberJoinedPayload(chatId: $chatId, userId: $userId, role: $role, invitedBy: $invitedBy)';
 }

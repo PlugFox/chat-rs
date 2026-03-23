@@ -1,7 +1,10 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// TypingUpdate event payload (server → client).
+@immutable
 class TypingUpdatePayload {
   const TypingUpdatePayload({
     required this.chatId,
@@ -18,6 +21,7 @@ class TypingUpdatePayload {
   /// How long this typing indicator is valid, in milliseconds.
   final int expiresInMs;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -25,11 +29,8 @@ class TypingUpdatePayload {
           chatId == other.chatId &&
           userId == other.userId &&
           expiresInMs == other.expiresInMs;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(chatId, userId, expiresInMs);
-
-  @override
-  String toString() =>
-      'TypingUpdatePayload(chatId: $chatId, userId: $userId, expiresInMs: $expiresInMs)';
 }

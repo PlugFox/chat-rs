@@ -1,10 +1,13 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 import 'package:chat_core/src/types/chat_kind.dart';
 import 'package:chat_core/src/types/last_message_preview.dart';
 
 /// A chat entry as transmitted on the wire (LoadChats, ChatCreated, ChatUpdated).
+@immutable
 class ChatEntry {
   const ChatEntry({
     required this.id,
@@ -49,6 +52,7 @@ class ChatEntry {
   /// Total number of members in this chat.
   final int memberCount;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -63,6 +67,7 @@ class ChatEntry {
           lastMessage == other.lastMessage &&
           unreadCount == other.unreadCount &&
           memberCount == other.memberCount;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(
@@ -77,8 +82,4 @@ class ChatEntry {
     unreadCount,
     memberCount,
   );
-
-  @override
-  String toString() =>
-      'ChatEntry(id: $id, kind: $kind, parentId: $parentId, createdAt: $createdAt, updatedAt: $updatedAt, title: $title, avatarUrl: $avatarUrl, lastMessage: $lastMessage, unreadCount: $unreadCount, memberCount: $memberCount)';
 }

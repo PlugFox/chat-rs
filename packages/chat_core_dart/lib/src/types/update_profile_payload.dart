@@ -1,10 +1,13 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// UpdateProfile frame payload (client → server, RPC).
 ///
 /// Uses updatable string semantics (u8 flag prefix):
 /// `None` = don't change, `Some("")` = clear, `Some("value")` = set.
+@immutable
 class UpdateProfilePayload {
   const UpdateProfilePayload({
     this.username,
@@ -25,6 +28,7 @@ class UpdateProfilePayload {
   /// New avatar URL.
   final String? avatarUrl;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -33,11 +37,8 @@ class UpdateProfilePayload {
           firstName == other.firstName &&
           lastName == other.lastName &&
           avatarUrl == other.avatarUrl;
+  // coverage:ignore-end
 
   @override
   int get hashCode => Object.hash(username, firstName, lastName, avatarUrl);
-
-  @override
-  String toString() =>
-      'UpdateProfilePayload(username: $username, firstName: $firstName, lastName: $lastName, avatarUrl: $avatarUrl)';
 }

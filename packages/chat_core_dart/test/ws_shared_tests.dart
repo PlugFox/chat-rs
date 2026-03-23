@@ -32,7 +32,7 @@ void wsTests({
   /// Connect to echo, run [body], then close cleanly.
   Future<void> withEcho(
     Future<void> Function(ChatWebSocket ws, Future<Uint8List> Function() next)
-        body,
+    body,
   ) async {
     final incoming = StreamController<Uint8List>();
     final closed = Completer<void>();
@@ -72,8 +72,9 @@ void wsTests({
         onClose: (code, reason) => closed.complete((code, reason)),
       );
       ws.close();
-      final (code, reason) =
-          await closed.future.timeout(const Duration(seconds: 5));
+      final (code, reason) = await closed.future.timeout(
+        const Duration(seconds: 5),
+      );
       expect(code, 1000);
       expect(reason, 'closed');
     });
@@ -87,8 +88,9 @@ void wsTests({
         onClose: (code, reason) => closed.complete((code, reason)),
       );
       ws.close(4001, 'custom reason');
-      final (code, reason) =
-          await closed.future.timeout(const Duration(seconds: 5));
+      final (code, reason) = await closed.future.timeout(
+        const Duration(seconds: 5),
+      );
       expect(code, 4001);
       expect(reason, 'custom reason');
     });
@@ -305,8 +307,9 @@ void wsTests({
         },
       );
 
-      final (code, reason) =
-          await closed.future.timeout(const Duration(seconds: 5));
+      final (code, reason) = await closed.future.timeout(
+        const Duration(seconds: 5),
+      );
       expect(code, 4000);
       expect(reason, 'goodbye');
 

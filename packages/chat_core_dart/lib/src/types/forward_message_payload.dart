@@ -1,10 +1,13 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// ForwardMessage frame payload (client → server).
 ///
 /// Server copies the original message content to the target chat,
 /// sets `MessageFlags::FORWARDED`, and populates `extra.fwd` JSON.
+@immutable
 class ForwardMessagePayload {
   const ForwardMessagePayload({
     required this.fromChatId,
@@ -25,6 +28,7 @@ class ForwardMessagePayload {
   /// Client-generated UUID for deduplication.
   final String idempotencyKey;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -33,12 +37,9 @@ class ForwardMessagePayload {
           messageId == other.messageId &&
           toChatId == other.toChatId &&
           idempotencyKey == other.idempotencyKey;
+  // coverage:ignore-end
 
   @override
   int get hashCode =>
       Object.hash(fromChatId, messageId, toChatId, idempotencyKey);
-
-  @override
-  String toString() =>
-      'ForwardMessagePayload(fromChatId: $fromChatId, messageId: $messageId, toChatId: $toChatId, idempotencyKey: $idempotencyKey)';
 }

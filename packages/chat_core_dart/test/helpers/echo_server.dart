@@ -24,10 +24,8 @@ class EchoServer {
 
   /// Starts the echo server on a random available port.
   static Future<EchoServer> start() async {
-    final httpServer =
-        await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final hangServer =
-        await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final httpServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final hangServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
 
     // Accept TCP but never respond — causes WS connect to hang.
     hangServer.listen((_) {});
@@ -43,8 +41,8 @@ class EchoServer {
 
       final socket = await WebSocketTransformer.upgrade(
         request,
-        protocolSelector: (protocols) =>
-            protocols.isNotEmpty ? protocols.first : null,
+        protocolSelector:
+            (protocols) => protocols.isNotEmpty ? protocols.first : null,
       );
       final path = request.uri.path;
       final params = request.uri.queryParameters;
@@ -60,16 +58,13 @@ class EchoServer {
         });
       } else {
         // Default: echo binary frames back.
-        socket.listen(
-          (data) {
-            try {
-              socket.add(data);
-            } on Object catch (_) {
-              // Client may have disconnected.
-            }
-          },
-          onError: (_) {},
-        );
+        socket.listen((data) {
+          try {
+            socket.add(data);
+          } on Object catch (_) {
+            // Client may have disconnected.
+          }
+        }, onError: (_) {});
       }
     });
 

@@ -17,9 +17,6 @@ void main() {
   });
 
   group('ChatWebSocket (Browser)', () {
-    wsTests(
-      echoPort: () => echoPort,
-      hangPort: () => hangPort,
-    );
+    wsTests(echoPort: () => echoPort, hangPort: () => hangPort);
   });
 }

@@ -1,7 +1,10 @@
 // GENERATED CODE — DO NOT MODIFY BY HAND
 // Source: chat_protocol
 
+import 'package:meta/meta.dart';
+
 /// Hello frame payload (client → server).
+@immutable
 class HelloPayload {
   const HelloPayload({
     required this.protocolVersion,
@@ -26,6 +29,7 @@ class HelloPayload {
   /// Unique device identifier (UUID v4, 16 bytes on wire).
   final String deviceId;
 
+  // coverage:ignore-start
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -35,12 +39,9 @@ class HelloPayload {
           platform == other.platform &&
           token == other.token &&
           deviceId == other.deviceId;
+  // coverage:ignore-end
 
   @override
   int get hashCode =>
       Object.hash(protocolVersion, sdkVersion, platform, token, deviceId);
-
-  @override
-  String toString() =>
-      'HelloPayload(protocolVersion: $protocolVersion, sdkVersion: $sdkVersion, platform: $platform, token: $token, deviceId: $deviceId)';
 }

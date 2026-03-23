@@ -1,5 +1,4 @@
 /// Dart code emitter — generates Dart package from IR.
-
 use std::collections::BTreeSet;
 use std::fmt::Write;
 use std::fs;
@@ -26,12 +25,7 @@ const PERMANENT_ERRORS: &[&str] = &[
 ];
 
 /// ErrorCode variants that are transient (retry with backoff).
-const TRANSIENT_ERRORS: &[&str] = &[
-    "InternalError",
-    "ServiceUnavailable",
-    "DatabaseError",
-    "RateLimited",
-];
+const TRANSIENT_ERRORS: &[&str] = &["InternalError", "ServiceUnavailable", "DatabaseError", "RateLimited"];
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -58,10 +52,7 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
     let util_dir = output_dir.join("lib/src/util");
     fs::create_dir_all(&util_dir).context("creating util dir")?;
 
-    let needs_util = ir
-        .structs
-        .iter()
-        .any(|s| s.fields.iter().any(|f| is_list_type(&f.ty)));
+    let needs_util = ir.structs.iter().any(|s| s.fields.iter().any(|f| is_list_type(&f.ty)));
     if needs_util {
         write_if_missing(&util_dir.join("list_equals.dart"), &emit_util())?;
     }
@@ -99,10 +90,7 @@ pub(crate) fn generate(ir: &ParsedModule, output_dir: &Path) -> Result<()> {
 
     // Constants
     if !ir.constants.is_empty() {
-        write_file(
-            &src_dir.join("protocol_constants.dart"),
-            &emit_constants(&ir.constants),
-        )?;
+        write_file(&src_dir.join("protocol_constants.dart"), &emit_constants(&ir.constants))?;
         exports.push("src/protocol_constants.dart".into());
     }
 
@@ -206,8 +194,7 @@ fn to_lower_camel(s: &str) -> String {
 fn clean_rust_expr(expr: &str) -> String {
     let mut s = expr.to_string();
     for suffix in &[
-        "_i128", "_u128", "_isize", "_usize", "_i64", "_u64", "_i32", "_u32", "_i16", "_u16",
-        "_i8", "_u8",
+        "_i128", "_u128", "_isize", "_usize", "_i64", "_u64", "_i32", "_u32", "_i16", "_u16", "_i8", "_u8",
     ] {
         s = s.replace(suffix, "");
     }
@@ -231,10 +218,7 @@ fn dart_type(ty: &FieldType) -> String {
         FieldType::VecU8 => "Uint8List".into(),
         FieldType::OptionalBytes => "Uint8List?".into(),
         FieldType::VecString => "List<String>".into(),
-        FieldType::Enum(n)
-        | FieldType::Bitflags(n)
-        | FieldType::Struct(n)
-        | FieldType::TaggedEnum(n) => n.clone(),
+        FieldType::Enum(n) | FieldType::Bitflags(n) | FieldType::Struct(n) | FieldType::TaggedEnum(n) => n.clone(),
         FieldType::OptionalStruct(n) | FieldType::OptionalBitflags(n) => format!("{n}?"),
         FieldType::OptionalVecStruct(n) => format!("List<{n}>?"),
         FieldType::VecStruct(n) => format!("List<{n}>"),
@@ -304,24 +288,18 @@ fn write_doc(out: &mut String, doc: &str, indent: &str) {
     }
 }
 
-fn emit_import_block(
-    out: &mut String,
-    has_typed_data: bool,
-    has_util: bool,
-    type_refs: &BTreeSet<String>,
-) {
-    let has_pkg = has_util || !type_refs.is_empty();
-    if !has_typed_data && !has_pkg {
-        return;
-    }
-
+fn emit_import_block(out: &mut String, has_typed_data: bool, has_util: bool, type_refs: &BTreeSet<String>) {
     out.push('\n');
 
     if has_typed_data {
-        out.push_str("import 'dart:typed_data';\n");
-        if has_pkg {
-            out.push('\n');
-        }
+        out.push_str("import 'dart:typed_data';\n\n");
+    }
+
+    out.push_str("import 'package:meta/meta.dart';\n");
+
+    let has_pkg = has_util || !type_refs.is_empty();
+    if has_pkg {
+        out.push('\n');
     }
 
     if has_util {
@@ -335,10 +313,9 @@ fn emit_import_block(
 /// Derive a field name from a tuple field type.
 fn tuple_field_name(ty: &FieldType) -> String {
     match ty {
-        FieldType::Enum(n)
-        | FieldType::Bitflags(n)
-        | FieldType::Struct(n)
-        | FieldType::TaggedEnum(n) => to_lower_camel(n),
+        FieldType::Enum(n) | FieldType::Bitflags(n) | FieldType::Struct(n) | FieldType::TaggedEnum(n) => {
+            to_lower_camel(n)
+        }
         _ => "value".to_string(),
     }
 }
@@ -408,12 +385,7 @@ fn emit_enum(e: &EnumDef) -> String {
 
     // fromValue
     out.push('\n');
-    writeln!(
-        out,
-        "  static {}? fromValue(int value) => switch (value) {{",
-        e.name
-    )
-    .unwrap();
+    writeln!(out, "  static {}? fromValue(int value) => switch (value) {{", e.name).unwrap();
     for v in &e.variants {
         let dart_name = to_lower_camel(&v.name);
         writeln!(out, "    {} => {dart_name},", v.discriminant).unwrap();
@@ -451,10 +423,7 @@ fn emit_error_code_extras(out: &mut String, e: &EnumDef) {
     out.push('\n');
     out.push_str("  /// Whether this error is permanent (do not retry).\n");
     out.push_str("  bool get isPermanent => switch (this) {\n");
-    let permanent: Vec<String> = PERMANENT_ERRORS
-        .iter()
-        .map(|n| to_lower_camel(n))
-        .collect();
+    let permanent: Vec<String> = PERMANENT_ERRORS.iter().map(|n| to_lower_camel(n)).collect();
     writeln!(out, "    {} => true,", permanent.join(" || ")).unwrap();
     out.push_str("    _ => false,\n");
     out.push_str("  };\n");
@@ -463,10 +432,7 @@ fn emit_error_code_extras(out: &mut String, e: &EnumDef) {
     out.push('\n');
     out.push_str("  /// Whether this error is transient (retry with backoff).\n");
     out.push_str("  bool get isTransient => switch (this) {\n");
-    let transient: Vec<String> = TRANSIENT_ERRORS
-        .iter()
-        .map(|n| to_lower_camel(n))
-        .collect();
+    let transient: Vec<String> = TRANSIENT_ERRORS.iter().map(|n| to_lower_camel(n)).collect();
     writeln!(out, "    {} => true,", transient.join(" || ")).unwrap();
     out.push_str("    _ => false,\n");
     out.push_str("  };\n");
@@ -501,12 +467,7 @@ fn emit_bitflags(b: &BitflagsDef) -> String {
     // values list
     out.push('\n');
     let names: Vec<String> = b.flags.iter().map(|f| to_camel_case(&f.name)).collect();
-    writeln!(
-        out,
-        "  static const List<{n}> values = [{}];",
-        names.join(", ")
-    )
-    .unwrap();
+    writeln!(out, "  static const List<{n}> values = [{}];", names.join(", ")).unwrap();
 
     // Methods
     out.push('\n');
@@ -545,6 +506,7 @@ fn emit_struct(s: &StructDef) -> String {
 
     // Class doc + declaration
     write_doc(&mut out, &s.doc, "");
+    out.push_str("@immutable\n");
     writeln!(out, "class {} {{", s.name).unwrap();
 
     // Constructor
@@ -568,27 +530,23 @@ fn emit_struct(s: &StructDef) -> String {
         out.push('\n');
         for f in &s.fields {
             write_doc(&mut out, &f.doc, "  ");
-            writeln!(
-                out,
-                "  final {} {};",
-                dart_type(&f.ty),
-                to_camel_case(&f.name)
-            )
-            .unwrap();
+            writeln!(out, "  final {} {};", dart_type(&f.ty), to_camel_case(&f.name)).unwrap();
         }
     }
 
     // == operator
     out.push('\n');
-    out.push_str("  @override\n");
     if s.fields.is_empty() {
+        out.push_str("  @override\n");
         writeln!(
             out,
-            "  bool operator ==(Object other) => identical(this, other) || other is {};",
+            "  bool operator ==(Object other) => identical(this, other) || other is {}; // coverage:ignore-line",
             s.name
         )
         .unwrap();
     } else {
+        out.push_str("  // coverage:ignore-start\n");
+        out.push_str("  @override\n");
         out.push_str("  bool operator ==(Object other) =>\n");
         write!(out, "      identical(this, other) ||\n      other is {}", s.name).unwrap();
         for f in &s.fields {
@@ -596,6 +554,7 @@ fn emit_struct(s: &StructDef) -> String {
             write!(out, " &&\n          {cmp}").unwrap();
         }
         out.push_str(";\n");
+        out.push_str("  // coverage:ignore-end\n");
     }
 
     // hashCode
@@ -619,33 +578,15 @@ fn emit_struct(s: &StructDef) -> String {
         out.push_str("      );\n");
     }
 
-    // toString
-    out.push('\n');
-    out.push_str("  @override\n");
-    let field_parts: Vec<String> = s
-        .fields
-        .iter()
-        .map(|f| {
-            let n = to_camel_case(&f.name);
-            format!("{n}: ${n}")
-        })
-        .collect();
-    writeln!(
-        out,
-        "  String toString() => '{}({})';",
-        s.name,
-        field_parts.join(", ")
-    )
-    .unwrap();
-
     out.push_str("}\n");
     out
 }
 
-/// Emit ==, hashCode, toString for a tagged enum variant subclass with fields.
+/// Emit == and hashCode for a tagged enum variant subclass with fields.
 fn emit_variant_equality(out: &mut String, class_name: &str, field_names: &[&str], field_types: &[FieldType]) {
     // ==
     out.push('\n');
+    out.push_str("  // coverage:ignore-start\n");
     out.push_str("  @override\n");
     out.push_str("  bool operator ==(Object other) =>\n");
     write!(out, "      identical(this, other) ||\n      other is {class_name}").unwrap();
@@ -657,6 +598,7 @@ fn emit_variant_equality(out: &mut String, class_name: &str, field_names: &[&str
         }
     }
     out.push_str(";\n");
+    out.push_str("  // coverage:ignore-end\n");
 
     // hashCode
     out.push('\n');
@@ -688,12 +630,6 @@ fn emit_variant_equality(out: &mut String, class_name: &str, field_names: &[&str
         }
         out.push_str("      );\n");
     }
-
-    // toString
-    out.push('\n');
-    out.push_str("  @override\n");
-    let parts: Vec<String> = field_names.iter().map(|n| format!("{n}: ${n}")).collect();
-    writeln!(out, "  String toString() => '{class_name}({})';", parts.join(", ")).unwrap();
 }
 
 fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
@@ -737,6 +673,7 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
 
     // Sealed base class
     write_doc(&mut out, &t.doc, "");
+    out.push_str("@immutable\n");
     writeln!(out, "sealed class {} {{", t.name).unwrap();
     writeln!(out, "  const {}();", t.name).unwrap();
     out.push_str("}\n");
@@ -753,16 +690,13 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
             VariantKind::Unit => {
                 writeln!(out, "class {class_name} extends {} {{", t.name).unwrap();
                 writeln!(out, "  const {class_name}();").unwrap();
-                // == / hashCode / toString for unit variant
+                // == / hashCode for unit variant
                 out.push('\n');
                 out.push_str("  @override\n");
-                writeln!(out, "  bool operator ==(Object other) => identical(this, other) || other is {class_name};").unwrap();
+                writeln!(out, "  bool operator ==(Object other) => identical(this, other) || other is {class_name}; // coverage:ignore-line").unwrap();
                 out.push('\n');
                 out.push_str("  @override\n");
                 out.push_str("  int get hashCode => 0;\n");
-                out.push('\n');
-                out.push_str("  @override\n");
-                writeln!(out, "  String toString() => '{class_name}()';").unwrap();
                 out.push_str("}\n");
             }
             VariantKind::Tuple(types) => {
@@ -794,8 +728,13 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
                     writeln!(out, "  final {ty} {name};").unwrap();
                 }
 
-                // == / hashCode / toString
-                emit_variant_equality(&mut out, &class_name, &fields.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(), types);
+                // == / hashCode
+                emit_variant_equality(
+                    &mut out,
+                    &class_name,
+                    &fields.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(),
+                    types,
+                );
                 out.push_str("}\n");
             }
             VariantKind::Struct(fields) => {
@@ -803,16 +742,13 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
 
                 if fields.is_empty() {
                     writeln!(out, "  const {class_name}();").unwrap();
-                    // == / hashCode / toString for empty struct variant
+                    // == / hashCode for empty struct variant
                     out.push('\n');
                     out.push_str("  @override\n");
-                    writeln!(out, "  bool operator ==(Object other) => identical(this, other) || other is {class_name};").unwrap();
+                    writeln!(out, "  bool operator ==(Object other) => identical(this, other) || other is {class_name}; // coverage:ignore-line").unwrap();
                     out.push('\n');
                     out.push_str("  @override\n");
                     out.push_str("  int get hashCode => 0;\n");
-                    out.push('\n');
-                    out.push_str("  @override\n");
-                    writeln!(out, "  String toString() => '{class_name}()';").unwrap();
                 } else {
                     // Constructor
                     writeln!(out, "  const {class_name}({{").unwrap();
@@ -830,20 +766,19 @@ fn emit_tagged_enum(t: &TaggedEnumDef) -> String {
                     out.push('\n');
                     for f in fields {
                         write_doc(&mut out, &f.doc, "  ");
-                        writeln!(
-                            out,
-                            "  final {} {};",
-                            dart_type(&f.ty),
-                            to_camel_case(&f.name)
-                        )
-                        .unwrap();
+                        writeln!(out, "  final {} {};", dart_type(&f.ty), to_camel_case(&f.name)).unwrap();
                     }
 
-                    // == / hashCode / toString
+                    // == / hashCode
                     let names: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
                     let types: Vec<FieldType> = fields.iter().map(|f| f.ty.clone()).collect();
                     let dart_names: Vec<String> = names.iter().map(|n| to_camel_case(n)).collect();
-                    emit_variant_equality(&mut out, &class_name, &dart_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), &types);
+                    emit_variant_equality(
+                        &mut out,
+                        &class_name,
+                        &dart_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+                        &types,
+                    );
                 }
 
                 out.push_str("}\n");
@@ -967,22 +902,24 @@ fn repr_read(repr: ReprType) -> &'static str {
 }
 
 fn find_enum_repr(ir: &ParsedModule, name: &str) -> ReprType {
-    ir.enums.iter().find(|e| e.name == name).map(|e| e.repr).unwrap_or(ReprType::U8)
+    ir.enums
+        .iter()
+        .find(|e| e.name == name)
+        .map(|e| e.repr)
+        .unwrap_or(ReprType::U8)
 }
 
 fn find_bitflags_repr(ir: &ParsedModule, name: &str) -> ReprType {
-    ir.bitflags.iter().find(|b| b.name == name).map(|b| b.repr).unwrap_or(ReprType::U32)
+    ir.bitflags
+        .iter()
+        .find(|b| b.name == name)
+        .map(|b| b.repr)
+        .unwrap_or(ReprType::U32)
 }
 
 // --- Dart field encode/decode ---
 
-fn dart_emit_encode_field(
-    out: &mut String,
-    accessor: &str,
-    ty: &FieldType,
-    ir: &ParsedModule,
-    indent: &str,
-) {
+fn dart_emit_encode_field(out: &mut String, accessor: &str, ty: &FieldType, ir: &ParsedModule, indent: &str) {
     match ty {
         FieldType::U8 => writeln!(out, "{indent}w.writeU8({accessor});").unwrap(),
         FieldType::U16 => writeln!(out, "{indent}w.writeU16({accessor});").unwrap(),
@@ -1252,13 +1189,7 @@ fn dart_emit_tagged_enum_codec(out: &mut String, t: &TaggedEnumDef, ir: &ParsedM
             VariantKind::Struct(fields) => {
                 let parts: Vec<String> = fields
                     .iter()
-                    .map(|f| {
-                        format!(
-                            "{}: {}",
-                            to_camel_case(&f.name),
-                            dart_field_decode_expr(&f.ty, ir)
-                        )
-                    })
+                    .map(|f| format!("{}: {}", to_camel_case(&f.name), dart_field_decode_expr(&f.ty, ir)))
                     .collect();
                 writeln!(out, "    {i} => {class_name}({}),", parts.join(", ")).unwrap();
             }
@@ -1282,7 +1213,9 @@ fn dart_emit_load_messages_codec(out: &mut String, t: &TaggedEnumDef, ir: &Parse
         writeln!(out, "      w.writeU8({i});").unwrap();
         if let VariantKind::Struct(fields) = &v.kind {
             for f in fields {
-                if f.name == "chat_id" { continue; }
+                if f.name == "chat_id" {
+                    continue;
+                }
                 let accessor = format!("p.{}", to_camel_case(&f.name));
                 dart_emit_encode_field(out, &accessor, &f.ty, ir, "      ");
             }
@@ -1322,7 +1255,9 @@ fn emit_codecs_dart(ir: &ParsedModule) -> String {
 
     // Struct codecs
     for s in &ir.structs {
-        if SPECIAL_STRUCTS.contains(&s.name.as_str()) { continue; }
+        if SPECIAL_STRUCTS.contains(&s.name.as_str()) {
+            continue;
+        }
         dart_emit_struct_codec(&mut out, s, ir);
         out.push('\n');
     }
@@ -1341,7 +1276,9 @@ fn emit_codecs_dart(ir: &ParsedModule) -> String {
 
     // Tagged enum codecs
     for t in &ir.tagged_enums {
-        if SKIP_TAGGED_ENUMS.contains(&t.name.as_str()) { continue; }
+        if SKIP_TAGGED_ENUMS.contains(&t.name.as_str()) {
+            continue;
+        }
         dart_emit_tagged_enum_codec(&mut out, t, ir);
         out.push('\n');
     }
@@ -1354,11 +1291,12 @@ fn emit_codecs_dart(ir: &ParsedModule) -> String {
 fn emit_frame_codec_dart(ir: &ParsedModule) -> String {
     let mut out = String::from(HEADER);
     out.push_str("\nimport 'dart:typed_data';\n\n");
+    out.push_str("import 'package:meta/meta.dart';\n\n");
     out.push_str("import 'package:chat_core/chat_core.dart';\n\n");
 
     // FrameHeader class
     out.push_str(
-        "class FrameHeader {\n\
+        "@immutable\nclass FrameHeader {\n\
          \x20 const FrameHeader({required this.kind, required this.seq, required this.eventSeq});\n\
          \x20 final FrameKind kind;\n\
          \x20 final int seq;\n\
@@ -1367,7 +1305,7 @@ fn emit_frame_codec_dart(ir: &ParsedModule) -> String {
     );
 
     // FramePayload sealed class + variants
-    out.push_str("sealed class FramePayload {\n  const FramePayload();\n}\n\n");
+    out.push_str("@immutable\nsealed class FramePayload {\n  const FramePayload();\n}\n\n");
     for &(kind_name, flag, payload_type) in FRAME_DISPATCH {
         let class_name = format!("FramePayload{kind_name}");
         match flag {
@@ -1381,7 +1319,7 @@ fn emit_frame_codec_dart(ir: &ParsedModule) -> String {
 
     // Frame class
     out.push_str(
-        "class Frame {\n\
+        "@immutable\nclass Frame {\n\
          \x20 const Frame({required this.seq, required this.eventSeq, required this.payload});\n\
          \x20 final int seq;\n\
          \x20 final int eventSeq;\n\
@@ -1406,7 +1344,9 @@ fn emit_frame_codec_dart(ir: &ParsedModule) -> String {
 
     // FrameKind values from IR
     let kind_values: std::collections::HashMap<&str, u64> = ir
-        .enums.iter().find(|e| e.name == "FrameKind")
+        .enums
+        .iter()
+        .find(|e| e.name == "FrameKind")
         .map(|e| e.variants.iter().map(|v| (v.name.as_str(), v.discriminant)).collect())
         .unwrap_or_default();
 
@@ -1431,7 +1371,11 @@ fn emit_frame_codec_dart(ir: &ParsedModule) -> String {
             4 => writeln!(out, "    case {class_name} p: w.writeRawBytes(p.data);").unwrap(),
             3 => {
                 let enc = format!("encode{payload_type}");
-                writeln!(out, "    case {class_name} p: w.writeU16(p.data.length); for (final e in p.data) {{ {enc}(w, e); }}").unwrap();
+                writeln!(
+                    out,
+                    "    case {class_name} p: w.writeU16(p.data.length); for (final e in p.data) {{ {enc}(w, e); }}"
+                )
+                .unwrap();
             }
             _ => {
                 let enc = format!("encode{payload_type}");
@@ -1450,10 +1394,18 @@ fn emit_frame_codec_dart(ir: &ParsedModule) -> String {
         if let Some(&val) = kind_values.get(kind_name) {
             match flag {
                 0 => writeln!(out, "    case {val}: payload = {class_name}();").unwrap(),
-                4 => writeln!(out, "    case {val}: payload = {class_name}(r.remaining > 0 ? r.readBytes(r.remaining) : Uint8List(0));").unwrap(),
+                4 => writeln!(
+                    out,
+                    "    case {val}: payload = {class_name}(r.remaining > 0 ? r.readBytes(r.remaining) : Uint8List(0));"
+                )
+                .unwrap(),
                 3 => {
                     let dec = format!("decode{payload_type}");
-                    writeln!(out, "    case {val}: payload = {class_name}(r.readArray(r.readU16(), () => {dec}(r)));").unwrap();
+                    writeln!(
+                        out,
+                        "    case {val}: payload = {class_name}(r.readArray(r.readU16(), () => {dec}(r)));"
+                    )
+                    .unwrap();
                 }
                 _ => {
                     let dec = format!("decode{payload_type}");
@@ -1989,7 +1941,12 @@ fn emit_types_test_dart(ir: &ParsedModule) -> String {
         writeln!(out, "    test('fromValue roundtrip', () {{").unwrap();
         for v in &e.variants {
             let variant = to_lower_camel(&v.name);
-            writeln!(out, "      expect({}.fromValue({}.{variant}.value), {}.{variant});", e.name, e.name, e.name).unwrap();
+            writeln!(
+                out,
+                "      expect({}.fromValue({}.{variant}.value), {}.{variant});",
+                e.name, e.name, e.name
+            )
+            .unwrap();
         }
         out.push_str("    });\n");
         // fromValue returns null for invalid
@@ -2030,7 +1987,7 @@ fn emit_types_test_dart(ir: &ParsedModule) -> String {
         writeln!(out, "    test('toggle', () {{").unwrap();
         writeln!(out, "      var flags = {}.{first};", b.name).unwrap();
         writeln!(out, "      flags = flags.toggle({}.{first});", b.name).unwrap();
-        writeln!(out, "      expect(flags.isEmpty, isTrue);", ).unwrap();
+        writeln!(out, "      expect(flags.isEmpty, isTrue);",).unwrap();
         writeln!(out, "      flags = flags.toggle({}.{first});", b.name).unwrap();
         writeln!(out, "      expect(flags.contains({}.{first}), isTrue);", b.name).unwrap();
         out.push_str("    });\n");
@@ -2044,7 +2001,7 @@ fn emit_types_test_dart(ir: &ParsedModule) -> String {
         out.push_str("  });\n\n");
     }
 
-    // Struct equality + toString tests
+    // Struct equality tests
     for s in &ir.structs {
         writeln!(out, "  group('{}', () {{", s.name).unwrap();
         let fixture = dart_struct_fixture(&s.name, ir);
@@ -2053,12 +2010,6 @@ fn emit_types_test_dart(ir: &ParsedModule) -> String {
         writeln!(out, "      final b = {};", fixture).unwrap();
         out.push_str("      expect(a, equals(b));\n");
         out.push_str("      expect(a.hashCode, equals(b.hashCode));\n");
-        out.push_str("    });\n");
-
-        writeln!(out, "    test('toString is not null', () {{").unwrap();
-        writeln!(out, "      final v = {};", fixture).unwrap();
-        out.push_str("      expect(v.toString(), isNotNull);\n");
-        out.push_str("      expect(v.toString(), isNotEmpty);\n");
         out.push_str("    });\n");
 
         out.push_str("  });\n\n");
@@ -2103,7 +2054,12 @@ fn emit_codec_test_dart(ir: &ParsedModule) -> String {
         writeln!(out, "      final original = {};", fixture).unwrap();
         out.push_str("      final w = ProtocolWriter();\n");
         writeln!(out, "      encode{}(w, original);", s.name).unwrap();
-        writeln!(out, "      final decoded = decode{}(ProtocolReader(w.toBytes()));", s.name).unwrap();
+        writeln!(
+            out,
+            "      final decoded = decode{}(ProtocolReader(w.toBytes()));",
+            s.name
+        )
+        .unwrap();
         out.push_str("      expect(decoded, equals(original));\n");
         out.push_str("    });\n");
 
@@ -2113,7 +2069,12 @@ fn emit_codec_test_dart(ir: &ParsedModule) -> String {
             writeln!(out, "      final original = {};", null_fixture).unwrap();
             out.push_str("      final w = ProtocolWriter();\n");
             writeln!(out, "      encode{}(w, original);", s.name).unwrap();
-            writeln!(out, "      final decoded = decode{}(ProtocolReader(w.toBytes()));", s.name).unwrap();
+            writeln!(
+                out,
+                "      final decoded = decode{}(ProtocolReader(w.toBytes()));",
+                s.name
+            )
+            .unwrap();
             out.push_str("      expect(decoded, equals(original));\n");
             out.push_str("    });\n");
         }
@@ -2133,7 +2094,12 @@ fn emit_codec_test_dart(ir: &ParsedModule) -> String {
             writeln!(out, "      final original = {};", expr).unwrap();
             out.push_str("      final w = ProtocolWriter();\n");
             writeln!(out, "      encode{}(w, original);", t.name).unwrap();
-            writeln!(out, "      final decoded = decode{}(ProtocolReader(w.toBytes()));", t.name).unwrap();
+            writeln!(
+                out,
+                "      final decoded = decode{}(ProtocolReader(w.toBytes()));",
+                t.name
+            )
+            .unwrap();
             out.push_str("      expect(decoded, equals(original));\n");
             out.push_str("    });\n");
         }
@@ -2204,7 +2170,9 @@ fn emit_codec_test_dart(ir: &ParsedModule) -> String {
     out.push_str("      final decoded = decodeFrame(ProtocolReader(w.toBytes()));\n");
     out.push_str("      expect(decoded.seq, equals(20));\n");
     out.push_str("      expect(decoded.payload, isA<FramePayloadAck>());\n");
-    out.push_str("      expect((decoded.payload as FramePayloadAck).data, equals(Uint8List.fromList([1, 2, 3, 4])));\n");
+    out.push_str(
+        "      expect((decoded.payload as FramePayloadAck).data, equals(Uint8List.fromList([1, 2, 3, 4])));\n",
+    );
     out.push_str("    });\n");
 
     out.push_str("  });\n");

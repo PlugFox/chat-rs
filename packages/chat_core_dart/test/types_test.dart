@@ -579,18 +579,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = LastMessagePreview(
-        id: 100000,
-        senderId: 100000,
-        createdAt: 1234567890,
-        kind: MessageKind.text,
-        flags: MessageFlags.edited,
-        contentPreview: 'hello',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('ChatEntry', () {
@@ -636,29 +624,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = ChatEntry(
-        id: 100000,
-        kind: ChatKind.direct,
-        parentId: 7,
-        createdAt: 1234567890,
-        updatedAt: 1234567890,
-        title: 'test',
-        avatarUrl: 'test',
-        lastMessage: LastMessagePreview(
-          id: 100000,
-          senderId: 100000,
-          createdAt: 1234567890,
-          kind: MessageKind.text,
-          flags: MessageFlags.edited,
-          contentPreview: 'hello',
-        ),
-        unreadCount: 100000,
-        memberCount: 100000,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('ChatMemberEntry', () {
@@ -675,15 +640,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = ChatMemberEntry(
-        userId: 100000,
-        role: ChatRole.member,
-        permissions: Permission.sendMessages,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -703,16 +659,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = RichSpan(
-        start: 100000,
-        end: 100000,
-        style: RichStyle.bold,
-        meta: 'test',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -760,30 +706,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = Message(
-        id: 100000,
-        chatId: 100000,
-        senderId: 100000,
-        createdAt: 1234567890,
-        updatedAt: 1234567890,
-        kind: MessageKind.text,
-        flags: MessageFlags.edited,
-        replyToId: 7,
-        content: 'hello',
-        richContent: [
-          RichSpan(
-            start: 100000,
-            end: 100000,
-            style: RichStyle.bold,
-            meta: 'test',
-          ),
-        ],
-        extra: 'test',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -842,35 +764,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = MessageBatch(
-        messages: [
-          Message(
-            id: 100000,
-            chatId: 100000,
-            senderId: 100000,
-            createdAt: 1234567890,
-            updatedAt: 1234567890,
-            kind: MessageKind.text,
-            flags: MessageFlags.edited,
-            replyToId: 7,
-            content: 'hello',
-            richContent: [
-              RichSpan(
-                start: 100000,
-                end: 100000,
-                style: RichStyle.bold,
-                meta: 'test',
-              ),
-            ],
-            extra: 'test',
-          ),
-        ],
-        hasMore: true,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('UserEntry', () {
@@ -898,20 +791,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = UserEntry(
-        id: 100000,
-        flags: UserFlags.system,
-        createdAt: 1234567890,
-        updatedAt: 1234567890,
-        username: 'test',
-        firstName: 'test',
-        lastName: 'test',
-        avatarUrl: 'test',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('PresenceEntry', () {
@@ -928,15 +807,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = PresenceEntry(
-        userId: 100000,
-        status: PresenceStatus.offline,
-        lastSeen: 1234567890,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -956,16 +826,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = ErrorPayload(
-        code: ErrorCode.unauthorized,
-        message: 'hello',
-        retryAfterMs: 100000,
-        extra: 'test',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -987,17 +847,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = HelloPayload(
-        protocolVersion: 42,
-        sdkVersion: 'hello',
-        platform: 'hello',
-        token: 'hello',
-        deviceId: '550e8400-e29b-41d4-a716-446655440000',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1036,25 +885,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = WelcomePayload(
-        sessionId: 100000,
-        serverTime: 1234567890,
-        userId: 100000,
-        limits: ServerLimits(
-          pingIntervalMs: 100000,
-          pingTimeoutMs: 100000,
-          maxMessageSize: 100000,
-          maxExtraSize: 100000,
-          maxFrameSize: 100000,
-          messagesPerSec: 1000,
-          connectionsPerIp: 1000,
-        ),
-        capabilities: ServerCapabilities.mediaUpload,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('ServerLimits', () {
@@ -1079,19 +909,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = ServerLimits(
-        pingIntervalMs: 100000,
-        pingTimeoutMs: 100000,
-        maxMessageSize: 100000,
-        maxExtraSize: 100000,
-        maxFrameSize: 100000,
-        messagesPerSec: 1000,
-        connectionsPerIp: 1000,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1120,20 +937,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = SendMessagePayload(
-        chatId: 100000,
-        kind: MessageKind.text,
-        idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
-        replyToId: 7,
-        content: 'hello',
-        richContent: Uint8List.fromList([1, 2]),
-        extra: 'test',
-        mentionedUserIds: [1, 2, 3],
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('EditMessagePayload', () {
@@ -1155,17 +958,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = EditMessagePayload(
-        chatId: 100000,
-        messageId: 100000,
-        content: 'hello',
-        richContent: Uint8List.fromList([1, 2]),
-        extra: 'test',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('DeleteMessagePayload', () {
@@ -1174,11 +966,6 @@ void main() {
       final b = DeleteMessagePayload(chatId: 100000, messageId: 100000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = DeleteMessagePayload(chatId: 100000, messageId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1189,11 +976,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = ReadReceiptPayload(chatId: 100000, messageId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('TypingPayload', () {
@@ -1203,11 +985,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = TypingPayload(chatId: 100000, expiresInMs: 1000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('GetPresencePayload', () {
@@ -1216,11 +993,6 @@ void main() {
       final b = GetPresencePayload(userIds: [1, 2, 3]);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = GetPresencePayload(userIds: [1, 2, 3]);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1241,16 +1013,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = SearchPayload(
-        scope: SearchScopeChat(chatId: 100000),
-        query: 'hello',
-        cursor: 100000,
-        limit: 1000,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('SubscribePayload', () {
@@ -1260,11 +1022,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = SubscribePayload(channels: ['a', 'b']);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('UnsubscribePayload', () {
@@ -1273,11 +1030,6 @@ void main() {
       final b = UnsubscribePayload(channels: ['a', 'b']);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = UnsubscribePayload(channels: ['a', 'b']);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1300,17 +1052,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = CreateChatPayload(
-        kind: ChatKind.direct,
-        parentId: 7,
-        title: 'test',
-        avatarUrl: 'test',
-        memberIds: [1, 2, 3],
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('UpdateChatPayload', () {
@@ -1328,15 +1069,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = UpdateChatPayload(
-        chatId: 100000,
-        title: 'updated',
-        avatarUrl: 'updated',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('DeleteChatPayload', () {
@@ -1346,11 +1078,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = DeleteChatPayload(chatId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('GetChatInfoPayload', () {
@@ -1359,11 +1086,6 @@ void main() {
       final b = GetChatInfoPayload(chatId: 100000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = GetChatInfoPayload(chatId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1382,15 +1104,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = GetChatMembersPayload(
-        chatId: 100000,
-        cursor: 100000,
-        limit: 1000,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('InviteMembersPayload', () {
@@ -1400,11 +1113,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = InviteMembersPayload(chatId: 100000, userIds: [1, 2, 3]);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('LeaveChatPayload', () {
@@ -1413,11 +1121,6 @@ void main() {
       final b = LeaveChatPayload(chatId: 100000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = LeaveChatPayload(chatId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1436,15 +1139,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = UpdateMemberPayload(
-        chatId: 100000,
-        userId: 100000,
-        action: const MemberActionKick(),
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('MessageDeletedPayload', () {
@@ -1453,11 +1147,6 @@ void main() {
       final b = MessageDeletedPayload(chatId: 100000, messageId: 100000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = MessageDeletedPayload(chatId: 100000, messageId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1476,15 +1165,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = ReceiptUpdatePayload(
-        chatId: 100000,
-        userId: 100000,
-        messageId: 100000,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('TypingUpdatePayload', () {
@@ -1501,15 +1181,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = TypingUpdatePayload(
-        chatId: 100000,
-        userId: 100000,
-        expiresInMs: 1000,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1530,16 +1201,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = MemberJoinedPayload(
-        chatId: 100000,
-        userId: 100000,
-        role: ChatRole.member,
-        invitedBy: 100000,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('MemberLeftPayload', () {
@@ -1549,11 +1210,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = MemberLeftPayload(chatId: 100000, userId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('ChatDeletedPayload', () {
@@ -1562,11 +1218,6 @@ void main() {
       final b = ChatDeletedPayload(chatId: 100000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = ChatDeletedPayload(chatId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1587,16 +1238,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = MemberUpdatedPayload(
-        chatId: 100000,
-        userId: 100000,
-        role: ChatRole.member,
-        permissions: Permission.sendMessages,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('AddReactionPayload', () {
@@ -1616,16 +1257,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = AddReactionPayload(
-        chatId: 100000,
-        messageId: 100000,
-        packId: 100000,
-        emojiIndex: 42,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('RemoveReactionPayload', () {
@@ -1644,16 +1275,6 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = RemoveReactionPayload(
-        chatId: 100000,
-        messageId: 100000,
-        packId: 100000,
-        emojiIndex: 42,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1678,18 +1299,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = ReactionUpdatePayload(
-        chatId: 100000,
-        messageId: 100000,
-        userId: 100000,
-        packId: 100000,
-        emojiIndex: 42,
-        added: true,
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('PinMessagePayload', () {
@@ -1698,11 +1307,6 @@ void main() {
       final b = PinMessagePayload(chatId: 100000, messageId: 100000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = PinMessagePayload(chatId: 100000, messageId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1713,11 +1317,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = UnpinMessagePayload(chatId: 100000, messageId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('RefreshTokenPayload', () {
@@ -1726,11 +1325,6 @@ void main() {
       final b = RefreshTokenPayload(token: 'hello');
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = RefreshTokenPayload(token: 'hello');
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1751,16 +1345,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = ForwardMessagePayload(
-        fromChatId: 100000,
-        messageId: 100000,
-        toChatId: 100000,
-        idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('GetUserPayload', () {
@@ -1770,11 +1354,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = GetUserPayload(userId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('GetUsersPayload', () {
@@ -1783,11 +1362,6 @@ void main() {
       final b = GetUsersPayload(userIds: [1, 2, 3]);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = GetUsersPayload(userIds: [1, 2, 3]);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1808,16 +1382,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = UpdateProfilePayload(
-        username: 'updated',
-        firstName: 'updated',
-        lastName: 'updated',
-        avatarUrl: 'updated',
-      );
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('BlockUserPayload', () {
@@ -1826,11 +1390,6 @@ void main() {
       final b = BlockUserPayload(userId: 100000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = BlockUserPayload(userId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1841,11 +1400,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = UnblockUserPayload(userId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('GetBlockListPayload', () {
@@ -1854,11 +1408,6 @@ void main() {
       final b = GetBlockListPayload(cursor: 100000, limit: 1000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = GetBlockListPayload(cursor: 100000, limit: 1000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 
@@ -1869,11 +1418,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
-    test('toString is not null', () {
-      final v = MuteChatPayload(chatId: 100000, durationSecs: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
-    });
   });
 
   group('UnmuteChatPayload', () {
@@ -1882,11 +1426,6 @@ void main() {
       final b = UnmuteChatPayload(chatId: 100000);
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
-    });
-    test('toString is not null', () {
-      final v = UnmuteChatPayload(chatId: 100000);
-      expect(v.toString(), isNotNull);
-      expect(v.toString(), isNotEmpty);
     });
   });
 

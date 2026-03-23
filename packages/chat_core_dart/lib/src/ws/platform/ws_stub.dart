@@ -4,9 +4,8 @@ import 'package:chat_core/src/ws/ws.dart' show ChatWebSocket;
 import 'package:meta/meta.dart';
 
 @internal
-ChatWebSocket $createChatWebSocket({
+Future<ChatWebSocket> $connectChatWebSocket({
   required String url,
-  required void Function() onOpen,
   required void Function(Uint8List message) onMessage,
   required void Function(Object error, StackTrace stackTrace) onError,
   required void Function(int code, String reason) onClose,

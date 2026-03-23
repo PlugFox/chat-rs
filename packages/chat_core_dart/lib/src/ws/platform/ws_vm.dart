@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:chat_core/src/ws/ws.dart' show ChatWebSocket;
+import 'package:meta/meta.dart';
 
+@internal
 ChatWebSocket $createChatWebSocket({
   required String url,
   required void Function() onOpen,

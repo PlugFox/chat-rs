@@ -78,8 +78,29 @@ Both use `governor` crate (GCRA algorithm).
 - Redis Pub/Sub for cross-node message delivery
 - Redis for presence with TTL + heartbeat
 - Redis for distributed rate limiting
+- Redis for message chunk caching
 
 Abstracted via `ClusterBackend` trait.
+
+### Redis Chunk Caching
+
+Completed message chunks (64 messages) are cacheable in Redis because message IDs
+are sequential and messages are never physically deleted — chunk boundaries are stable.
+
+Cache key: `chat:{chat_id}:chunk:{chunk_id}`
+
+Value: serialized list of messages + `max_updated_at`. TTL ~1h or LRU eviction.
+
+**On any message mutation in a chunk:**
+```
+DEL chat:{chat_id}:chunk:{message_id >> 6}
+```
+
+Almost all mutations happen in the last (and occasionally second-to-last) chunk,
+so cache invalidation is rare and surgical. Completed chunks (all 64 slots filled)
+are effectively immutable — only edits/deletes can invalidate them.
+
+See [protocol.md — Message Chunks](protocol.md#message-chunks) for chunk layout.
 
 ## Graceful Shutdown
 

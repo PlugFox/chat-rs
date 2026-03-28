@@ -409,6 +409,19 @@ int chunkStart(int chunkId)   => chunkId << chunkShift;
 
 Sparse chunk map — `Map<int, MessagesChunk>`, not `List` (chunks loaded non-sequentially).
 
+### Chunk Trust & Lazy Invalidation
+
+Каждый чанк имеет `max_updated_at` (максимальный `updated_at` среди его сообщений).
+При скролле к чанку клиент проверяет trust set и при необходимости запрашивает delta:
+`LoadMessages(mode=Chunk, chunk_id, since_ts=max_updated_at)`.
+
+Trust set (`Set<int>`) хранит chunk_id, подтверждённые сервером в текущей сессии.
+Сбрасывается при disconnect и при смене чата. Подробнее: [client.md — Trust Model](client.md#trust-model--hashset-of-trusted-chunks).
+
+`max_updated_at` для delta-запросов вычисляется из таблицы `messages` напрямую:
+`SELECT MAX(updated_at) FROM messages WHERE chat_id = ? AND id >= chunk_start AND id < chunk_start + 64`.
+Отдельная таблица не нужна — range scan по PK `(chat_id, id)` покрывает максимум 64 строки.
+
 ### Eviction
 
 Chunks more than 3 away from current anchor — evicted from memory.

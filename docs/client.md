@@ -38,26 +38,73 @@ payload: { session_id, server_time, user_id (i64), ServerLimits, ServerCapabilit
 
 Отправлять **Ping** каждые N секунд (N задаётся через `ServerLimits.ping_interval_ms`). Если Pong не пришёл за timeout — переподключиться.
 
-## Message Loading & Dirty State
+## Message Loading & Chunk-Based Cache
 
 Сервер не пушит историю автоматически. Клиент управляет загрузкой сам:
 
-- `LoadMessages(chat_id, anchor_id, direction, limit)` — загрузить страницу сообщений
+- `LoadMessages` mode 0 (Paginate) — загрузить страницу: `anchor_id`, `direction`, `limit`
+- `LoadMessages` mode 2 (Chunk) — загрузить/обновить чанк: `chunk_id`, `since_ts`
 - `anchor_id = 0` — загрузить с самого нового
-- Cursor-based: `load_older` → `anchor_id = min_id_на_экране`, `load_newer` → `anchor_id = max_id_на_экране`
 
-### Dirty State
+Подробнее о режимах: [protocol.md — LoadMessages](protocol.md#loadmessages-0x1a).
 
-Сообщения из локального кэша считаются **dirty** по умолчанию — они могли быть отредактированы или удалены пока клиент был offline. При reconnect все сообщения снова становятся dirty.
+### Lazy Cache Invalidation
 
-Рекомендуемый подход на клиенте:
+Основные принципы:
 
-- Держать `Set<int>` "чистых" message_id per chat — сбрасывается при каждом reconnect
-- Сообщения, пришедшие через WS (MessageNew, MessageEdited) в текущей сессии — сразу чистые, добавляются в Set
-- Сообщения загруженные через `LoadMessages` — чистые после получения от сервера
-- Сообщения из локального кэша, не попавшие в Set — dirty, будут обновлены при скролле к ним
+1. **Никакой истории обновлений на сервере.** Сервер хранит только текущее состояние сущностей.
+2. **Локальный кэш доверяем только в рамках активного WS-соединения.** При disconnect/reconnect — все кэшированные данные считаются stale.
+3. **Ленивая инвалидация.** Обновления запрашиваются только для того, что пользователь сейчас видит.
 
-Сами модели сообщений иммутабельны — dirty state хранится снаружи.
+### Trust Model — HashSet of Trusted Chunks
+
+Каждый чат хранит in-memory `Set<int>` доверенных chunk_id. Чанк добавляется в set только после явного подтверждения от сервера в рамках текущего соединения.
+
+**On disconnect:**
+```
+trustedChunkIds.clear()
+```
+
+**On chat switch:**
+```
+trustedChunkIds.clear()   // prevents unbounded growth
+```
+
+**On scroll to a chunk:**
+```
+if (chunkId not in trustedChunkIds) {
+    // max_updated_at computed from messages table:
+    // SELECT COALESCE(MAX(updated_at), 0)
+    // FROM messages WHERE chat_id = ? AND id >= chunkStart AND id < chunkStart + 64
+    sinceTs = getLocalMaxUpdatedAt(chatId, chunkId)
+    loadMessages(mode=Chunk, chunkId, sinceTs)
+}
+```
+
+**On response received:**
+```
+upsertMessages(response.messages)
+trustedChunkIds.add(chunkId)
+```
+
+Чанк запрашивается максимум один раз за соединение. При повторном скролле к доверенному чанку — запрос не отправляется.
+
+Сообщения, пришедшие через WS-события (`MessageNew`, `MessageEdited`) в текущей сессии, автоматически доверены — они обновляют чанк в памяти без повторного запроса.
+
+### Bootstrap on Reconnect
+
+Ленивая синхронизация чанков не покрывает события, не связанные с видимым контентом. Сразу после подключения клиент отправляет один запрос:
+
+`LoadChats` (mode 0, limit) — возвращает метаданные чатов: `last_message_preview`, `unread_count`, `updated_at`. **Не** включает содержимое сообщений.
+
+| Событие                              | Механизм                                              |
+| ------------------------------------- | ----------------------------------------------------- |
+| Новое сообщение в закрытом чате       | WS push → обновить `unread_count` в списке чатов     |
+| Добавлен/удалён из чата               | `LoadChats` при reconnect                             |
+| Изменилось название/аватар чата       | `LoadChats` при reconnect                             |
+| Сообщение отредактировано в открытом  | WS push → обновить в памяти, чанк уже доверен        |
+
+Сами модели сообщений иммутабельны — trust state хранится снаружи.
 
 ## Seq Numbers
 

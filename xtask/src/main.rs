@@ -2,6 +2,7 @@
 #![allow(clippy::disallowed_macros)]
 
 mod check;
+mod ci;
 mod codegen;
 
 use std::env;
@@ -15,6 +16,14 @@ fn main() -> ExitCode {
         Some("check") => check::check(),
         Some("fmt") => check::fmt(),
         Some("test") => check::test(),
+        Some("ci") => {
+            let fix = args.iter().any(|a| a == "--fix");
+            let base = args[1..]
+                .iter()
+                .find(|a| !a.starts_with('-'))
+                .map(String::as_str);
+            ci::ci(base, fix)
+        }
         Some("codegen") => {
             let workspace_root = workspace_root();
             let is_check = args.iter().any(|a| a == "--check");
@@ -38,11 +47,15 @@ fn print_help() {
 Usage: cargo xtask <TASK>
 
 Tasks:
-  check    Run clippy + fmt check + tests on workspace
-  fmt      Run rustfmt on workspace
-  test     Run all tests
-  codegen  Generate Dart & TypeScript packages from chat_protocol
-           --check  Verify generated code is up to date (CI mode)"
+  check       Run clippy + fmt check + tests on workspace
+  fmt         Run rustfmt on workspace
+  test        Run all tests
+  ci [BASE]   Smart CI — detect changed files vs BASE branch and run
+              only the relevant checks (Rust/Dart/TypeScript).
+              BASE defaults to 'develop' (or 'master' if on develop).
+              --fix  Auto-fix formatting, lints, and regenerate code.
+  codegen     Generate Dart & TypeScript packages from chat_protocol
+              --check  Verify generated code is up to date (CI mode)"
     );
 }
 

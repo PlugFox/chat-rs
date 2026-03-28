@@ -310,11 +310,14 @@ Because message IDs are sequential per-chat and messages are never physically de
 chunk boundaries are stable and predictable. This enables:
 
 - **Server-side caching** — completed chunks (64 messages) are immutable and can be
-  cached in Redis by `(chat_id, chunk_id)` with no invalidation needed. The last
-  (incomplete) chunk is invalidated on new messages or edits.
+  cached in Redis by key `chat:{chat_id}:chunk:{chunk_id}` with no invalidation needed.
+  The last (incomplete) chunk is invalidated on new messages or edits. See
+  [server.md — Redis Chunk Caching](server.md#redis-chunk-caching).
 - **Client-side caching** — clients store and manage messages in chunk granularity.
-  To check for updates, the client sends a chunk request with `since_ts` set to the
-  maximum `updated_at` it has locally for that chunk.
+  To check for updates, the client computes `MAX(updated_at)` from the local `messages`
+  table for the chunk's ID range and sends it as `since_ts`. A per-chat trust set ensures
+  each chunk is requested at most once per WS connection. See
+  [client.md — Lazy Cache Invalidation](client.md#lazy-cache-invalidation).
 - **Frontend layout** — UI can render and virtualize messages in chunk-sized blocks,
   managing loading/unloading state per chunk.
 

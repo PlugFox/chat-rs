@@ -583,6 +583,56 @@
                 "clear": true
             }
         },
+        // ── CI ─────────────────────────────────────────────────
+        {
+            "label": "xtask:ci",
+            "detail": "Smart CI — check only changed Rust/Dart/TS vs base branch",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "ci"
+            ],
+            "icon": {
+                "id": "rocket",
+                "color": "terminal.ansiGreen"
+            },
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "xtask:ci:fix",
+            "detail": "Smart CI + auto-fix formatting, lints, codegen",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "ci",
+                "--fix"
+            ],
+            "icon": {
+                "id": "wand",
+                "color": "terminal.ansiYellow"
+            },
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
         // ── Dart ──────────────────────────────────────────────
         {
             "label": "dart:test",

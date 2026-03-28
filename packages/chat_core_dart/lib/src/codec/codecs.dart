@@ -823,6 +823,11 @@ void encodeLoadMessagesPayload(ProtocolWriter w, LoadMessagesPayload v) {
       w.writeU32(p.fromId);
       w.writeU32(p.toId);
       w.writeTimestamp(p.sinceTs);
+    case LoadMessagesChunk p:
+      w.writeU32(p.chatId);
+      w.writeU8(2);
+      w.writeU32(p.chunkId);
+      w.writeTimestamp(p.sinceTs);
   }
 }
 
@@ -840,6 +845,11 @@ LoadMessagesPayload decodeLoadMessagesPayload(ProtocolReader r) {
       chatId: chatId,
       fromId: r.readU32(),
       toId: r.readU32(),
+      sinceTs: r.readTimestamp(),
+    ),
+    2 => LoadMessagesChunk(
+      chatId: chatId,
+      chunkId: r.readU32(),
       sinceTs: r.readTimestamp(),
     ),
     _ => throw CodecError('unknown LoadMessagesPayload mode: $d'),

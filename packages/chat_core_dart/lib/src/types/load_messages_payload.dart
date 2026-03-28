@@ -7,9 +7,10 @@ import 'package:chat_core/src/types/load_direction.dart';
 
 /// LoadMessages frame payload (client → server).
 ///
-/// Two modes selected by discriminant:
+/// Three modes selected by discriminant:
 /// - Mode 0: anchor-based pagination (history load)
 /// - Mode 1: range update check (catch-up after reconnect)
+/// - Mode 2: chunk load/update (chunk-based access)
 @immutable
 sealed class LoadMessagesPayload {
   const LoadMessagesPayload();
@@ -85,4 +86,36 @@ class LoadMessagesRangeCheck extends LoadMessagesPayload {
 
   @override
   int get hashCode => Object.hash(chatId, fromId, toId, sinceTs);
+}
+
+/// Chunk load/update (mode 2).
+class LoadMessagesChunk extends LoadMessagesPayload {
+  const LoadMessagesChunk({
+    required this.chatId,
+    required this.chunkId,
+    required this.sinceTs,
+  });
+
+  /// Target chat.
+  final int chatId;
+
+  /// Chunk index (`message_id >> CHUNK_SHIFT`).
+  final int chunkId;
+
+  /// Return only messages with `updated_at > since_ts`.
+  /// `0` = return all messages in the chunk.
+  final int sinceTs;
+
+  // coverage:ignore-start
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LoadMessagesChunk &&
+          chatId == other.chatId &&
+          chunkId == other.chunkId &&
+          sinceTs == other.sinceTs;
+  // coverage:ignore-end
+
+  @override
+  int get hashCode => Object.hash(chatId, chunkId, sinceTs);
 }

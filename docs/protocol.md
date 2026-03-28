@@ -258,7 +258,7 @@ and future extensibility. Response: `Ack` (empty).
 
 ### LoadMessages (0x1A)
 
-Two modes selected by `mode: u8`.
+Three modes selected by `mode: u8`.
 
 **Mode 0 — anchor-based pagination** (history load):
 
@@ -278,6 +278,45 @@ chat_id: u32 | mode: u8=1 | from_id: u32 | to_id: u32 | since_ts: i64
 
 Response: `Ack` with `MessageBatch` containing only messages where
 `updated_at > since_ts` within `[from_id, to_id]`. Empty batch = nothing changed.
+
+**Mode 2 — chunk load/update** (chunk-based access):
+
+```
+chat_id: u32 | mode: u8=2 | chunk_id: u32 | since_ts: i64
+```
+
+Requests messages belonging to a chunk. `chunk_id = message_id >> CHUNK_SHIFT` (see
+[Message Chunks](#message-chunks)). A chunk covers IDs `[chunk_id × 64, chunk_id × 64 + 63]`.
+
+- `since_ts = 0` — return all messages in the chunk (full load).
+- `since_ts > 0` — return only messages with `updated_at > since_ts` (delta update).
+
+Response: `Ack` with `MessageBatch` (up to 64 messages, `has_more = false`).
+
+### Message Chunks
+
+Messages are grouped into fixed-size **chunks** of 64 messages based on their per-chat ID:
+
+```
+CHUNK_SHIFT = 6
+CHUNK_SIZE  = 1 << CHUNK_SHIFT  = 64
+
+chunk_id    = message_id >> CHUNK_SHIFT
+first_id    = chunk_id << CHUNK_SHIFT       (= chunk_id × 64)
+last_id     = first_id + CHUNK_SIZE - 1     (= chunk_id × 64 + 63)
+```
+
+Because message IDs are sequential per-chat and messages are never physically deleted,
+chunk boundaries are stable and predictable. This enables:
+
+- **Server-side caching** — completed chunks (64 messages) are immutable and can be
+  cached in Redis by `(chat_id, chunk_id)` with no invalidation needed. The last
+  (incomplete) chunk is invalidated on new messages or edits.
+- **Client-side caching** — clients store and manage messages in chunk granularity.
+  To check for updates, the client sends a chunk request with `since_ts` set to the
+  maximum `updated_at` it has locally for that chunk.
+- **Frontend layout** — UI can render and virtualize messages in chunk-sized blocks,
+  managing loading/unloading state per chunk.
 
 ### LoadChats (0x16)
 

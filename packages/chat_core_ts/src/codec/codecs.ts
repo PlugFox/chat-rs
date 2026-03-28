@@ -1116,6 +1116,12 @@ export function encodeLoadMessagesPayload(
       w.writeU32(v.toId);
       w.writeTimestamp(v.sinceTs);
       break;
+    case "chunk":
+      w.writeU32(v.chatId);
+      w.writeU8(2);
+      w.writeU32(v.chunkId);
+      w.writeTimestamp(v.sinceTs);
+      break;
   }
 }
 
@@ -1143,6 +1149,13 @@ export function decodeLoadMessagesPayload(
         chatId: chatId,
         fromId: r.readU32(),
         toId: r.readU32(),
+        sinceTs: r.readTimestamp(),
+      };
+    case 2:
+      return {
+        type: "chunk",
+        chatId: chatId,
+        chunkId: r.readU32(),
         sinceTs: r.readTimestamp(),
       };
     default:

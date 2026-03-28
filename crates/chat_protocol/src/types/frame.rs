@@ -521,9 +521,10 @@ impl LoadDirection {
 
 /// LoadMessages frame payload (client → server).
 ///
-/// Two modes selected by discriminant:
+/// Three modes selected by discriminant:
 /// - Mode 0: anchor-based pagination (history load)
 /// - Mode 1: range update check (catch-up after reconnect)
+/// - Mode 2: chunk load/update (chunk-based access)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoadMessagesPayload {
     /// Anchor-based pagination (mode 0).
@@ -546,6 +547,19 @@ pub enum LoadMessagesPayload {
         /// End of the range (inclusive).
         to_id: u32,
         /// `MAX(updated_at)` from client's local cache for this range.
+        since_ts: i64,
+    },
+    /// Chunk load/update (mode 2).
+    ///
+    /// Request all messages in a chunk, or only those updated after `since_ts`.
+    /// `chunk_id = message_id >> CHUNK_SHIFT`. See [`CHUNK_SHIFT`](crate::CHUNK_SHIFT).
+    Chunk {
+        /// Target chat.
+        chat_id: u32,
+        /// Chunk index (`message_id >> CHUNK_SHIFT`).
+        chunk_id: u32,
+        /// Return only messages with `updated_at > since_ts`.
+        /// `0` = return all messages in the chunk.
         since_ts: i64,
     },
 }

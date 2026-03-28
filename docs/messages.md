@@ -6,6 +6,8 @@
 
 `Message` is the core data unit. Messages travel in batches (`MessageBatch`) — as payloads of `SyncBatch` events (real-time push) and `LoadMessages` responses (history load).
 
+Messages are also addressed in fixed-size **chunks** of 64 (`CHUNK_SIZE`). See [protocol.md — Message Chunks](protocol.md#message-chunks) for the chunking scheme and how `LoadMessages` mode 2 uses it.
+
 ## Fields
 
 | Field        | Wire type         | Rust type               | Description                                              |

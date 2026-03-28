@@ -404,6 +404,34 @@ mod unit {
     }
 
     #[test]
+    fn load_messages_chunk_roundtrip() {
+        let payload = LoadMessagesPayload::Chunk {
+            chat_id: 7,
+            chunk_id: 3,
+            since_ts: 0,
+        };
+        let mut buf = BytesMut::new();
+        encode_load_messages(&mut buf, &payload).unwrap();
+
+        let decoded = decode_load_messages(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn load_messages_chunk_with_since_ts_roundtrip() {
+        let payload = LoadMessagesPayload::Chunk {
+            chat_id: 42,
+            chunk_id: 15,
+            since_ts: 1_711_100_000,
+        };
+        let mut buf = BytesMut::new();
+        encode_load_messages(&mut buf, &payload).unwrap();
+
+        let decoded = decode_load_messages(&mut buf).unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
     fn error_payload_roundtrip() {
         let payload = ErrorPayload {
             code: ErrorCode::RateLimited,
@@ -1944,7 +1972,7 @@ mod proptests {
         }
 
         #[test]
-        fn load_messages_roundtrip(
+        fn load_messages_paginate_roundtrip(
             chat_id in any::<u32>(),
             anchor_id in any::<u32>(),
             limit in any::<u16>(),
@@ -1955,6 +1983,42 @@ mod proptests {
                 direction: LoadDirection::from_u8(dir).unwrap(),
                 anchor_id,
                 limit,
+            };
+            let mut buf = BytesMut::new();
+            encode_load_messages(&mut buf, &payload).unwrap();
+            let decoded = decode_load_messages(&mut buf).unwrap();
+            prop_assert_eq!(decoded, payload);
+        }
+
+        #[test]
+        fn load_messages_range_check_roundtrip(
+            chat_id in any::<u32>(),
+            from_id in any::<u32>(),
+            to_id in any::<u32>(),
+            since_ts in 0i64..((1i64 << 41) - 1),
+        ) {
+            let payload = LoadMessagesPayload::RangeCheck {
+                chat_id,
+                from_id,
+                to_id,
+                since_ts,
+            };
+            let mut buf = BytesMut::new();
+            encode_load_messages(&mut buf, &payload).unwrap();
+            let decoded = decode_load_messages(&mut buf).unwrap();
+            prop_assert_eq!(decoded, payload);
+        }
+
+        #[test]
+        fn load_messages_chunk_roundtrip(
+            chat_id in any::<u32>(),
+            chunk_id in any::<u32>(),
+            since_ts in 0i64..((1i64 << 41) - 1),
+        ) {
+            let payload = LoadMessagesPayload::Chunk {
+                chat_id,
+                chunk_id,
+                since_ts,
             };
             let mut buf = BytesMut::new();
             encode_load_messages(&mut buf, &payload).unwrap();

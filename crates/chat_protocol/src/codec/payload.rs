@@ -447,6 +447,16 @@ pub fn encode_load_messages(buf: &mut impl BufMut, p: &LoadMessagesPayload) -> R
             write_u32(buf, *to_id);
             write_timestamp(buf, *since_ts)?;
         }
+        LoadMessagesPayload::Chunk {
+            chat_id,
+            chunk_id,
+            since_ts,
+        } => {
+            write_u32(buf, *chat_id);
+            write_u8(buf, 2); // mode
+            write_u32(buf, *chunk_id);
+            write_timestamp(buf, *since_ts)?;
+        }
     }
     Ok(())
 }
@@ -480,6 +490,15 @@ pub fn decode_load_messages(buf: &mut impl Buf) -> Result<LoadMessagesPayload, C
                 chat_id,
                 from_id,
                 to_id,
+                since_ts,
+            })
+        }
+        2 => {
+            let chunk_id = read_u32(buf)?;
+            let since_ts = read_timestamp(buf)?;
+            Ok(LoadMessagesPayload::Chunk {
+                chat_id,
+                chunk_id,
                 since_ts,
             })
         }

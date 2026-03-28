@@ -36,6 +36,17 @@ pub const MIN_TIMESTAMP: i64 = 0;
 /// Catches milliseconds-instead-of-seconds bugs and is JS Number-safe.
 pub const MAX_TIMESTAMP: i64 = (1_i64 << 41) - 1;
 
+/// Number of bits to shift a message ID right to get its chunk index.
+///
+/// `chunk_id = message_id >> CHUNK_SHIFT`
+pub const CHUNK_SHIFT: u32 = 6;
+
+/// Number of messages per chunk (1 << CHUNK_SHIFT = 64).
+///
+/// Messages with IDs `[chunk_id * CHUNK_SIZE, (chunk_id + 1) * CHUNK_SIZE - 1]`
+/// belong to the same chunk.
+pub const CHUNK_SIZE: u32 = 1 << CHUNK_SHIFT;
+
 /// Bitmask for detecting event_seq overflow.
 ///
 /// When `event_seq & EVENT_SEQ_OVERFLOW_MASK != 0` (top 2 bits set),

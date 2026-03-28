@@ -42,7 +42,11 @@ pub(crate) fn fmt() -> ExitCode {
             eprintln!("Failed to run cargo fmt: {e}");
             exit(1);
         });
-    if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+    if status.success() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 pub(crate) fn test() -> ExitCode {
@@ -53,5 +57,9 @@ pub(crate) fn test() -> ExitCode {
             eprintln!("Failed to run cargo test: {e}");
             exit(1);
         });
-    if status.success() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+    if status.success() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }

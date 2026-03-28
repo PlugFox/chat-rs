@@ -1,5 +1,4 @@
 /// TypeScript code emitter — generates TS package from IR.
-
 use std::collections::BTreeSet;
 use std::fmt::Write;
 use std::fs;
@@ -23,12 +22,7 @@ const PERMANENT_ERRORS: &[&str] = &[
 ];
 
 /// ErrorCode variants that are transient (retry with backoff).
-const TRANSIENT_ERRORS: &[&str] = &[
-    "InternalError",
-    "ServiceUnavailable",
-    "DatabaseError",
-    "RateLimited",
-];
+const TRANSIENT_ERRORS: &[&str] = &["InternalError", "ServiceUnavailable", "DatabaseError", "RateLimited"];
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -174,14 +168,12 @@ fn to_snake_case(s: &str) -> String {
 fn to_camel_case(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut cap_next = false;
-    for (i, c) in s.chars().enumerate() {
+    for c in s.chars() {
         if c == '_' {
             cap_next = true;
         } else if cap_next {
             out.push(c.to_ascii_uppercase());
             cap_next = false;
-        } else if i == 0 {
-            out.push(c.to_ascii_lowercase());
         } else {
             out.push(c.to_ascii_lowercase());
         }
@@ -206,8 +198,7 @@ fn to_lower_camel(s: &str) -> String {
 fn clean_rust_expr(expr: &str) -> String {
     let mut s = expr.to_string();
     for suffix in &[
-        "_i128", "_u128", "_isize", "_usize", "_i64", "_u64", "_i32", "_u32", "_i16", "_u16",
-        "_i8", "_u8",
+        "_i128", "_u128", "_isize", "_usize", "_i64", "_u64", "_i32", "_u32", "_i16", "_u16", "_i8", "_u8",
     ] {
         s = s.replace(suffix, "");
     }
@@ -256,7 +247,6 @@ fn collect_field_refs(ty: &FieldType, refs: &mut BTreeSet<String>) {
     }
 }
 
-
 // ---------------------------------------------------------------------------
 // Doc & import helpers
 // ---------------------------------------------------------------------------
@@ -280,7 +270,6 @@ fn write_doc(out: &mut String, doc: &str, indent: &str) {
         writeln!(out, "{indent} */").unwrap();
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // Emitters
@@ -363,12 +352,7 @@ fn emit_enum(e: &EnumDef) -> String {
             .all(|w| w[1].discriminant == w[0].discriminant + 1);
 
     out.push('\n');
-    writeln!(
-        out,
-        "/** Convert wire value to {}, or undefined if unknown. */",
-        e.name
-    )
-    .unwrap();
+    writeln!(out, "/** Convert wire value to {}, or undefined if unknown. */", e.name).unwrap();
     writeln!(
         out,
         "export function {fn_name}(value: number): {} | undefined {{",
@@ -387,12 +371,7 @@ fn emit_enum(e: &EnumDef) -> String {
     } else {
         out.push_str("  switch (value) {\n");
         for v in &e.variants {
-            writeln!(
-                out,
-                "    case {}: return {}.{};",
-                v.discriminant, e.name, v.name
-            )
-            .unwrap();
+            writeln!(out, "    case {}: return {}.{};", v.discriminant, e.name, v.name).unwrap();
         }
         out.push_str("    default: return undefined;\n");
         out.push_str("  }\n");
@@ -459,9 +438,7 @@ fn emit_disconnect_code_extras(out: &mut String) {
     out.push_str("/** Whether the client should attempt reconnection. */\n");
     out.push_str("export function shouldReconnect(code: DisconnectCode): boolean {\n");
     out.push_str("  const v = code as number;\n");
-    out.push_str(
-        "  return (v >= 0 && v < 1000) || (v >= 3000 && v < 3500) || (v >= 4000 && v < 4500);\n",
-    );
+    out.push_str("  return (v >= 0 && v < 1000) || (v >= 3000 && v < 3500) || (v >= 4000 && v < 4500);\n");
     out.push_str("}\n");
 }
 
@@ -766,13 +743,7 @@ fn find_bitflags_repr(ir: &ParsedModule, name: &str) -> ReprType {
 // Field-level encode/decode
 // ---------------------------------------------------------------------------
 
-fn emit_encode_field(
-    out: &mut String,
-    accessor: &str,
-    ty: &FieldType,
-    ir: &ParsedModule,
-    indent: &str,
-) {
+fn emit_encode_field(out: &mut String, accessor: &str, ty: &FieldType, ir: &ParsedModule, indent: &str) {
     match ty {
         FieldType::U8 => writeln!(out, "{indent}w.writeU8({accessor});").unwrap(),
         FieldType::U16 => writeln!(out, "{indent}w.writeU16({accessor});").unwrap(),
@@ -823,7 +794,11 @@ fn emit_encode_field(
         }
         FieldType::OptionalBitflags(name) => {
             let wfn = repr_write(find_bitflags_repr(ir, name));
-            writeln!(out, "{indent}if ({accessor} !== null) {{ w.writeU8(1); w.{wfn}({accessor}); }} else {{ w.writeU8(0); }}").unwrap();
+            writeln!(
+                out,
+                "{indent}if ({accessor} !== null) {{ w.writeU8(1); w.{wfn}({accessor}); }} else {{ w.writeU8(0); }}"
+            )
+            .unwrap();
         }
         FieldType::OptionalVecStruct(name) => {
             writeln!(out, "{indent}if ({accessor} !== null) {{ w.writeU8(1); w.writeU32({accessor}.length); for (const _v of {accessor}) encode{name}(w, _v); }} else {{ w.writeU8(0); }}").unwrap();
@@ -872,9 +847,7 @@ fn field_decode_expr(ty: &FieldType, ir: &ParsedModule) -> String {
             format!("r.readU8() === 1 ? r.{rfn}() : null")
         }
         FieldType::OptionalVecStruct(name) => {
-            format!(
-                "r.readU8() === 1 ? r.readArray(r.readU32(), () => decode{name}(r)) : null"
-            )
+            format!("r.readU8() === 1 ? r.readArray(r.readU32(), () => decode{name}(r)) : null")
         }
         FieldType::VecStruct(name) => {
             format!("r.readArray(r.readU32(), () => decode{name}(r))")
@@ -889,7 +862,11 @@ fn field_decode_expr(ty: &FieldType, ir: &ParsedModule) -> String {
 
 fn emit_struct_codec(out: &mut String, s: &StructDef, ir: &ParsedModule) {
     let name = &s.name;
-    writeln!(out, "export function encode{name}(w: ProtocolWriter, v: {name}): void {{").unwrap();
+    writeln!(
+        out,
+        "export function encode{name}(w: ProtocolWriter, v: {name}): void {{"
+    )
+    .unwrap();
     for f in &s.fields {
         let accessor = format!("v.{}", to_camel_case(&f.name));
         emit_encode_field(out, &accessor, &f.ty, ir, "  ");
@@ -1006,7 +983,11 @@ fn emit_tagged_enum_codec(out: &mut String, t: &TaggedEnumDef, ir: &ParsedModule
     }
 
     // --- encode ---
-    writeln!(out, "export function encode{name}(w: ProtocolWriter, v: {name}): void {{").unwrap();
+    writeln!(
+        out,
+        "export function encode{name}(w: ProtocolWriter, v: {name}): void {{"
+    )
+    .unwrap();
     out.push_str("  switch (v.type) {\n");
     for (i, v) in t.variants.iter().enumerate() {
         let tag = to_lower_camel(&v.name);
@@ -1063,27 +1044,28 @@ fn emit_tagged_enum_codec(out: &mut String, t: &TaggedEnumDef, ir: &ParsedModule
             VariantKind::Struct(fields) => {
                 let parts: Vec<String> = fields
                     .iter()
-                    .map(|f| {
-                        format!(
-                            "{}: {}",
-                            to_camel_case(&f.name),
-                            field_decode_expr(&f.ty, ir)
-                        )
-                    })
+                    .map(|f| format!("{}: {}", to_camel_case(&f.name), field_decode_expr(&f.ty, ir)))
                     .collect();
                 writeln!(out, "      return {{ type: '{tag}', {} }};", parts.join(", ")).unwrap();
             }
         }
     }
-    writeln!(out, "    default: throw new CodecError(`unknown {name} discriminant: ${{_d}}`);")
-        .unwrap();
+    writeln!(
+        out,
+        "    default: throw new CodecError(`unknown {name} discriminant: ${{_d}}`);"
+    )
+    .unwrap();
     out.push_str("  }\n}\n");
 }
 
 fn emit_load_messages_codec(out: &mut String, t: &TaggedEnumDef, ir: &ParsedModule) {
     let name = &t.name;
 
-    writeln!(out, "export function encode{name}(w: ProtocolWriter, v: {name}): void {{").unwrap();
+    writeln!(
+        out,
+        "export function encode{name}(w: ProtocolWriter, v: {name}): void {{"
+    )
+    .unwrap();
     out.push_str("  switch (v.type) {\n");
     for (i, v) in t.variants.iter().enumerate() {
         let tag = to_lower_camel(&v.name);
@@ -1115,18 +1097,18 @@ fn emit_load_messages_codec(out: &mut String, t: &TaggedEnumDef, ir: &ParsedModu
                     if f.name == "chat_id" {
                         format!("{}: chatId", to_camel_case(&f.name))
                     } else {
-                        format!(
-                            "{}: {}",
-                            to_camel_case(&f.name),
-                            field_decode_expr(&f.ty, ir)
-                        )
+                        format!("{}: {}", to_camel_case(&f.name), field_decode_expr(&f.ty, ir))
                     }
                 })
                 .collect();
             writeln!(out, "      return {{ type: '{tag}', {} }};", parts.join(", ")).unwrap();
         }
     }
-    writeln!(out, "    default: throw new CodecError(`unknown {name} mode: ${{_d}}`);").unwrap();
+    writeln!(
+        out,
+        "    default: throw new CodecError(`unknown {name} mode: ${{_d}}`);"
+    )
+    .unwrap();
     out.push_str("  }\n}\n");
 }
 
@@ -1187,14 +1169,10 @@ fn emit_codecs_ts(ir: &ParsedModule) -> String {
     if has_error_payload && enum_refs.contains("ErrorCode") {
         out.push_str("import { errorCodeSlug } from '../types/error-code.js';\n");
     } else if has_error_payload {
-        out.push_str(
-            "import { errorCodeFromValue, errorCodeSlug } from '../types/error-code.js';\n",
-        );
+        out.push_str("import { errorCodeFromValue, errorCodeSlug } from '../types/error-code.js';\n");
     }
     if has_message && !enum_refs.contains("MessageKind") {
-        out.push_str(
-            "import { messageKindFromValue } from '../types/message-kind.js';\n",
-        );
+        out.push_str("import { messageKindFromValue } from '../types/message-kind.js';\n");
     }
     // Bitflags: no imports needed (they're just numbers)
     // Struct/tagged enum type imports (for function signatures)
@@ -1306,9 +1284,7 @@ fn emit_frame_codec_ts(ir: &ParsedModule) -> String {
     out.push_str("import { CodecError } from './error.js';\n");
     out.push_str("import { ProtocolReader } from './reader.js';\n");
     out.push_str("import { ProtocolWriter } from './writer.js';\n");
-    out.push_str(
-        "import { type FrameKind, frameKindFromValue } from '../types/frame-kind.js';\n",
-    );
+    out.push_str("import { type FrameKind, frameKindFromValue } from '../types/frame-kind.js';\n");
 
     let mut codec_fns = BTreeSet::new();
     let mut type_imports = BTreeSet::new();
@@ -1349,21 +1325,13 @@ fn emit_frame_codec_ts(ir: &ParsedModule) -> String {
         let tag = to_lower_camel(kind_name);
         match flag {
             0 => writeln!(out, "  | {{ readonly type: '{tag}' }}").unwrap(),
-            4 => writeln!(
-                out,
-                "  | {{ readonly type: '{tag}'; readonly data: Uint8Array }}"
-            )
-            .unwrap(),
+            4 => writeln!(out, "  | {{ readonly type: '{tag}'; readonly data: Uint8Array }}").unwrap(),
             3 => writeln!(
                 out,
                 "  | {{ readonly type: '{tag}'; readonly data: readonly {payload_type}[] }}"
             )
             .unwrap(),
-            _ => writeln!(
-                out,
-                "  | {{ readonly type: '{tag}'; readonly data: {payload_type} }}"
-            )
-            .unwrap(),
+            _ => writeln!(out, "  | {{ readonly type: '{tag}'; readonly data: {payload_type} }}").unwrap(),
         }
     }
     out.push_str(";\n\n");
@@ -1397,12 +1365,7 @@ fn emit_frame_codec_ts(ir: &ParsedModule) -> String {
         .enums
         .iter()
         .find(|e| e.name == "FrameKind")
-        .map(|e| {
-            e.variants
-                .iter()
-                .map(|v| (v.name.as_str(), v.discriminant))
-                .collect()
-        })
+        .map(|e| e.variants.iter().map(|v| (v.name.as_str(), v.discriminant)).collect())
         .unwrap_or_default();
 
     out.push_str("function framePayloadKind(p: FramePayload): FrameKind {\n  switch (p.type) {\n");
@@ -1427,8 +1390,7 @@ fn emit_frame_codec_ts(ir: &ParsedModule) -> String {
         let tag = to_lower_camel(kind_name);
         match flag {
             0 => writeln!(out, "    case '{tag}': break;").unwrap(),
-            4 => writeln!(out, "    case '{tag}': w.writeRawBytes(frame.payload.data); break;")
-                .unwrap(),
+            4 => writeln!(out, "    case '{tag}': w.writeRawBytes(frame.payload.data); break;").unwrap(),
             3 => {
                 let enc = format!("encode{payload_type}");
                 writeln!(out, "    case '{tag}': w.writeU16(frame.payload.data.length); for (const _e of frame.payload.data) {enc}(w, _e); break;").unwrap();
@@ -1847,8 +1809,9 @@ fn ts_tagged_enum_fixture(name: &str, ir: &ParsedModule) -> String {
 /// Field name for a tuple variant (single-element).
 fn ts_tuple_field_name(ty: &FieldType) -> String {
     match ty {
-        FieldType::Enum(n) | FieldType::Bitflags(n) | FieldType::Struct(n)
-        | FieldType::TaggedEnum(n) => to_lower_camel(n),
+        FieldType::Enum(n) | FieldType::Bitflags(n) | FieldType::Struct(n) | FieldType::TaggedEnum(n) => {
+            to_lower_camel(n)
+        }
         FieldType::U32 => "value".into(),
         FieldType::VecU8 => "data".into(),
         _ => "value".into(),
@@ -1945,7 +1908,7 @@ fn emit_types_test_ts(ir: &ParsedModule) -> String {
     // Collect all needed imports
     let mut imports = BTreeSet::new();
     for e in &ir.enums {
-        imports.insert(format!("{}", e.name));
+        imports.insert(e.name.to_string());
         imports.insert(format!("{}FromValue", to_lower_camel(&e.name)));
     }
     for b in &ir.bitflags {
@@ -1962,7 +1925,12 @@ fn emit_types_test_ts(ir: &ParsedModule) -> String {
         writeln!(out, "describe('{}', () => {{", e.name).unwrap();
         writeln!(out, "  it('fromValue roundtrip', () => {{").unwrap();
         for v in &e.variants {
-            writeln!(out, "    expect({fn_name}({}.{})).toBe({}.{});", e.name, v.name, e.name, v.name).unwrap();
+            writeln!(
+                out,
+                "    expect({fn_name}({}.{})).toBe({}.{});",
+                e.name, v.name, e.name, v.name
+            )
+            .unwrap();
         }
         out.push_str("  });\n");
         writeln!(out, "  it('fromValue returns undefined for invalid', () => {{").unwrap();
@@ -1976,26 +1944,57 @@ fn emit_types_test_ts(ir: &ParsedModule) -> String {
         writeln!(out, "describe('{}', () => {{", b.name).unwrap();
 
         let first = &b.flags[0].name;
-        let second = if b.flags.len() > 1 {
-            &b.flags[1].name
-        } else {
-            first
-        };
+        let second = if b.flags.len() > 1 { &b.flags[1].name } else { first };
 
         writeln!(out, "  it('contains', () => {{").unwrap();
-        writeln!(out, "    expect({}.contains({}.{first}, {}.{first})).toBe(true);", b.name, b.name, b.name).unwrap();
+        writeln!(
+            out,
+            "    expect({}.contains({}.{first}, {}.{first})).toBe(true);",
+            b.name, b.name, b.name
+        )
+        .unwrap();
         if b.flags.len() > 1 {
-            writeln!(out, "    expect({}.contains({}.{first}, {}.{second})).toBe(false);", b.name, b.name, b.name).unwrap();
+            writeln!(
+                out,
+                "    expect({}.contains({}.{first}, {}.{second})).toBe(false);",
+                b.name, b.name, b.name
+            )
+            .unwrap();
         }
         out.push_str("  });\n");
 
         writeln!(out, "  it('add and remove', () => {{").unwrap();
-        writeln!(out, "    let flags = {}.add({}.{first}, {}.{second});", b.name, b.name, b.name).unwrap();
-        writeln!(out, "    expect({}.contains(flags, {}.{first})).toBe(true);", b.name, b.name).unwrap();
-        writeln!(out, "    expect({}.contains(flags, {}.{second})).toBe(true);", b.name, b.name).unwrap();
+        writeln!(
+            out,
+            "    let flags = {}.add({}.{first}, {}.{second});",
+            b.name, b.name, b.name
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "    expect({}.contains(flags, {}.{first})).toBe(true);",
+            b.name, b.name
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "    expect({}.contains(flags, {}.{second})).toBe(true);",
+            b.name, b.name
+        )
+        .unwrap();
         writeln!(out, "    flags = {}.remove(flags, {}.{first});", b.name, b.name).unwrap();
-        writeln!(out, "    expect({}.contains(flags, {}.{first})).toBe(false);", b.name, b.name).unwrap();
-        writeln!(out, "    expect({}.contains(flags, {}.{second})).toBe(true);", b.name, b.name).unwrap();
+        writeln!(
+            out,
+            "    expect({}.contains(flags, {}.{first})).toBe(false);",
+            b.name, b.name
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "    expect({}.contains(flags, {}.{second})).toBe(true);",
+            b.name, b.name
+        )
+        .unwrap();
         out.push_str("  });\n");
 
         writeln!(out, "  it('toggle', () => {{").unwrap();
@@ -2097,7 +2096,12 @@ fn emit_codec_test_ts(ir: &ParsedModule) -> String {
         writeln!(out, "    const original: {} = {};", s.name, fixture).unwrap();
         out.push_str("    const w = new ProtocolWriter();\n");
         writeln!(out, "    encode{}(w, original);", s.name).unwrap();
-        writeln!(out, "    const decoded = decode{}(new ProtocolReader(w.toBytes()));", s.name).unwrap();
+        writeln!(
+            out,
+            "    const decoded = decode{}(new ProtocolReader(w.toBytes()));",
+            s.name
+        )
+        .unwrap();
         out.push_str("    expect(decoded).toEqual(original);\n");
         out.push_str("  });\n");
 
@@ -2107,7 +2111,12 @@ fn emit_codec_test_ts(ir: &ParsedModule) -> String {
             writeln!(out, "    const original: {} = {};", s.name, null_fixture).unwrap();
             out.push_str("    const w = new ProtocolWriter();\n");
             writeln!(out, "    encode{}(w, original);", s.name).unwrap();
-            writeln!(out, "    const decoded = decode{}(new ProtocolReader(w.toBytes()));", s.name).unwrap();
+            writeln!(
+                out,
+                "    const decoded = decode{}(new ProtocolReader(w.toBytes()));",
+                s.name
+            )
+            .unwrap();
             out.push_str("    expect(decoded).toEqual(original);\n");
             out.push_str("  });\n");
         }
@@ -2127,7 +2136,12 @@ fn emit_codec_test_ts(ir: &ParsedModule) -> String {
             writeln!(out, "    const original: {} = {};", t.name, expr).unwrap();
             out.push_str("    const w = new ProtocolWriter();\n");
             writeln!(out, "    encode{}(w, original);", t.name).unwrap();
-            writeln!(out, "    const decoded = decode{}(new ProtocolReader(w.toBytes()));", t.name).unwrap();
+            writeln!(
+                out,
+                "    const decoded = decode{}(new ProtocolReader(w.toBytes()));",
+                t.name
+            )
+            .unwrap();
             out.push_str("    expect(decoded).toEqual(original);\n");
             out.push_str("  });\n");
         }
@@ -2193,8 +2207,10 @@ fn collect_test_imports(ty: &FieldType, ir: &ParsedModule, imports: &mut BTreeSe
         FieldType::Bitflags(name) | FieldType::OptionalBitflags(name) => {
             imports.insert(name.clone());
         }
-        FieldType::Struct(name) | FieldType::OptionalStruct(name)
-        | FieldType::VecStruct(name) | FieldType::OptionalVecStruct(name) => {
+        FieldType::Struct(name)
+        | FieldType::OptionalStruct(name)
+        | FieldType::VecStruct(name)
+        | FieldType::OptionalVecStruct(name) => {
             // Recurse into struct fields
             if let Some(s) = ir.structs.iter().find(|s| s.name == *name) {
                 for f in &s.fields {
@@ -2228,8 +2244,10 @@ fn collect_test_imports(ty: &FieldType, ir: &ParsedModule, imports: &mut BTreeSe
 /// Collect type-only imports for TS interfaces/types.
 fn collect_type_imports(ty: &FieldType, imports: &mut BTreeSet<String>) {
     match ty {
-        FieldType::Struct(n) | FieldType::OptionalStruct(n)
-        | FieldType::VecStruct(n) | FieldType::OptionalVecStruct(n) => {
+        FieldType::Struct(n)
+        | FieldType::OptionalStruct(n)
+        | FieldType::VecStruct(n)
+        | FieldType::OptionalVecStruct(n) => {
             imports.insert(n.clone());
         }
         FieldType::TaggedEnum(n) => {

@@ -18,10 +18,7 @@ fn main() -> ExitCode {
         Some("test") => check::test(),
         Some("ci") => {
             let fix = args.iter().any(|a| a == "--fix");
-            let base = args[1..]
-                .iter()
-                .find(|a| !a.starts_with('-'))
-                .map(String::as_str);
+            let base = args[1..].iter().find(|a| !a.starts_with('-')).map(String::as_str);
             ci::ci(base, fix)
         }
         Some("codegen") => {

@@ -35,28 +35,20 @@ pub(crate) fn ci(base: Option<&str>, fix: bool) -> ExitCode {
 
     let mut failed = false;
 
-    if scope.rust {
-        if !run_rust_checks(fix) {
-            failed = true;
-        }
+    if scope.rust && !run_rust_checks(fix) {
+        failed = true;
     }
 
-    if scope.codegen_check {
-        if !run_codegen_check(fix) {
-            failed = true;
-        }
+    if scope.codegen_check && !run_codegen_check(fix) {
+        failed = true;
     }
 
-    if scope.dart {
-        if !run_dart_checks(fix) {
-            failed = true;
-        }
+    if scope.dart && !run_dart_checks(fix) {
+        failed = true;
     }
 
-    if scope.typescript {
-        if !run_typescript_checks(fix) {
-            failed = true;
-        }
+    if scope.typescript && !run_typescript_checks(fix) {
+        failed = true;
     }
 
     if failed {
@@ -106,8 +98,7 @@ impl ChangeScope {
             if name == "Cargo.toml" || name == "Cargo.lock" {
                 rust = true;
             }
-            if name == "pubspec.yaml" || name == "pubspec.lock" || name == "analysis_options.yaml"
-            {
+            if name == "pubspec.yaml" || name == "pubspec.lock" || name == "analysis_options.yaml" {
                 dart = true;
             }
             if name == "package.json"
@@ -268,10 +259,7 @@ fn run_dart_checks(fix: bool) -> bool {
             "Dart",
             dir,
             &[
-                (
-                    "Checking formatting",
-                    &["dart", "format", "--set-exit-if-changed", "."],
-                ),
+                ("Checking formatting", &["dart", "format", "--set-exit-if-changed", "."]),
                 ("Analyzing", &["dart", "analyze", "--fatal-infos"]),
                 ("Running tests", &["dart", "test"]),
             ],

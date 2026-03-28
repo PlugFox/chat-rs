@@ -6,11 +6,10 @@
 /// Two-pass approach:
 /// 1. Scan all files, collect type names → categories (enum/struct/bitflags/tagged).
 /// 2. Parse fully, resolving field type cross-references using the registry.
-
 use std::collections::HashMap;
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use proc_macro2::TokenStream;
 use syn::parse::Parse;
 use syn::{Attribute, Expr, ExprLit, Fields, Item, Lit, Meta, PathArguments, Type};
@@ -50,18 +49,14 @@ pub(crate) fn parse_protocol(protocol_src: &Path) -> Result<ParsedModule> {
     let mut files = Vec::new();
     for name in &file_names {
         let path = types_dir.join(name);
-        let src =
-            std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
-        let ast =
-            syn::parse_file(&src).with_context(|| format!("parse {}", path.display()))?;
+        let src = std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+        let ast = syn::parse_file(&src).with_context(|| format!("parse {}", path.display()))?;
         files.push((*name, ast));
     }
 
     let lib_path = protocol_src.join("lib.rs");
-    let lib_src =
-        std::fs::read_to_string(&lib_path).with_context(|| format!("read {}", lib_path.display()))?;
-    let lib_ast =
-        syn::parse_file(&lib_src).with_context(|| format!("parse {}", lib_path.display()))?;
+    let lib_src = std::fs::read_to_string(&lib_path).with_context(|| format!("read {}", lib_path.display()))?;
+    let lib_ast = syn::parse_file(&lib_src).with_context(|| format!("parse {}", lib_path.display()))?;
 
     // Pass 1 — build type registry for cross-reference resolution.
     let mut reg = Registry::new();
@@ -72,8 +67,7 @@ pub(crate) fn parse_protocol(protocol_src: &Path) -> Result<ParsedModule> {
     // Pass 2 — extract full definitions.
     let mut module = ParsedModule::default();
     for (fname, ast) in &files {
-        extract_items(ast, &reg, &mut module)
-            .with_context(|| format!("extracting from {fname}"))?;
+        extract_items(ast, &reg, &mut module).with_context(|| format!("extracting from {fname}"))?;
     }
 
     // Constants from lib.rs.
@@ -94,10 +88,7 @@ fn scan_types(ast: &syn::File, reg: &mut Registry) {
                 if SKIP_TYPES.contains(&name.as_str()) {
                     continue;
                 }
-                let has_data = e
-                    .variants
-                    .iter()
-                    .any(|v| !matches!(v.fields, Fields::Unit));
+                let has_data = e.variants.iter().any(|v| !matches!(v.fields, Fields::Unit));
                 if has_data {
                     reg.insert(name, TypeCat::TaggedEnum);
                 } else if get_repr(&e.attrs).is_some() {
@@ -167,14 +158,9 @@ fn extract_items(ast: &syn::File, reg: &Registry, module: &mut ParsedModule) -> 
                 if SKIP_TYPES.contains(&name.as_str()) {
                     continue;
                 }
-                let has_data = e
-                    .variants
-                    .iter()
-                    .any(|v| !matches!(v.fields, Fields::Unit));
+                let has_data = e.variants.iter().any(|v| !matches!(v.fields, Fields::Unit));
                 if has_data {
-                    module
-                        .tagged_enums
-                        .push(parse_tagged_enum(e, reg)?);
+                    module.tagged_enums.push(parse_tagged_enum(e, reg)?);
                 } else if let Some(repr) = get_repr(&e.attrs) {
                     module.enums.push(parse_plain_enum(e, repr)?);
                 }
@@ -209,9 +195,7 @@ fn parse_plain_enum(e: &syn::ItemEnum, repr: ReprType) -> Result<EnumDef> {
             .transpose()?
             .unwrap_or_else(|| {
                 // Auto-increment from previous.
-                variants
-                    .last()
-                    .map_or(0, |prev: &EnumVariant| prev.discriminant + 1)
+                variants.last().map_or(0, |prev: &EnumVariant| prev.discriminant + 1)
             });
         variants.push(EnumVariant {
             name: v.ident.to_string(),
@@ -360,8 +344,7 @@ impl Parse for BfInput {
 }
 
 fn parse_bitflags(m: &syn::ItemMacro) -> Result<BitflagsDef> {
-    let bf: BfInput =
-        syn::parse2(m.mac.tokens.clone()).context("parsing bitflags! macro content")?;
+    let bf: BfInput = syn::parse2(m.mac.tokens.clone()).context("parsing bitflags! macro content")?;
 
     let repr = match bf.repr_ty.to_string().as_str() {
         "u8" => ReprType::U8,
@@ -559,10 +542,7 @@ fn extract_doc(attrs: &[Attribute]) -> String {
                 return None;
             }
             if let Meta::NameValue(nv) = &attr.meta {
-                if let Expr::Lit(ExprLit {
-                    lit: Lit::Str(s), ..
-                }) = &nv.value
-                {
+                if let Expr::Lit(ExprLit { lit: Lit::Str(s), .. }) = &nv.value {
                     return Some(s.value());
                 }
             }
@@ -607,10 +587,7 @@ fn eval_expr(expr: &Expr) -> Result<u64> {
                 bail!("unsupported unary operator")
             }
         }
-        _ => bail!(
-            "unsupported expression: {}",
-            quote::quote!(#expr)
-        ),
+        _ => bail!("unsupported expression: {}", quote::quote!(#expr)),
     }
 }
 
@@ -663,21 +640,13 @@ mod tests {
         assert_eq!(chat_kind.variants[2].discriminant, 2);
 
         let frame_kind = module.enums.iter().find(|e| e.name == "FrameKind").unwrap();
-        let send_msg = frame_kind
-            .variants
-            .iter()
-            .find(|v| v.name == "SendMessage")
-            .unwrap();
+        let send_msg = frame_kind.variants.iter().find(|v| v.name == "SendMessage").unwrap();
         assert_eq!(send_msg.discriminant, 0x10);
 
         let error_code = module.enums.iter().find(|e| e.name == "ErrorCode").unwrap();
         assert_eq!(error_code.repr, ReprType::U16);
         assert_eq!(error_code.variants.len(), 23);
-        let unauthorized = error_code
-            .variants
-            .iter()
-            .find(|v| v.name == "Unauthorized")
-            .unwrap();
+        let unauthorized = error_code.variants.iter().find(|v| v.name == "Unauthorized").unwrap();
         assert_eq!(unauthorized.discriminant, 1000);
     }
 
@@ -693,33 +662,17 @@ mod tests {
         assert!(names.contains(&"ServerCapabilities"));
         assert_eq!(module.bitflags.len(), 5);
 
-        let perm = module
-            .bitflags
-            .iter()
-            .find(|b| b.name == "Permission")
-            .unwrap();
+        let perm = module.bitflags.iter().find(|b| b.name == "Permission").unwrap();
         assert_eq!(perm.repr, ReprType::U32);
         assert_eq!(perm.flags.len(), 15);
 
-        let send = perm
-            .flags
-            .iter()
-            .find(|f| f.name == "SEND_MESSAGES")
-            .unwrap();
+        let send = perm.flags.iter().find(|f| f.name == "SEND_MESSAGES").unwrap();
         assert_eq!(send.value, 1);
 
-        let manage_roles = perm
-            .flags
-            .iter()
-            .find(|f| f.name == "MANAGE_ROLES")
-            .unwrap();
+        let manage_roles = perm.flags.iter().find(|f| f.name == "MANAGE_ROLES").unwrap();
         assert_eq!(manage_roles.value, 1 << 23);
 
-        let delete_chat = perm
-            .flags
-            .iter()
-            .find(|f| f.name == "DELETE_CHAT")
-            .unwrap();
+        let delete_chat = perm.flags.iter().find(|f| f.name == "DELETE_CHAT").unwrap();
         assert_eq!(delete_chat.value, 1u64 << 31);
     }
 
@@ -727,11 +680,7 @@ mod tests {
     fn struct_fields() {
         let module = parse_protocol(&protocol_src()).unwrap();
 
-        let chat_entry = module
-            .structs
-            .iter()
-            .find(|s| s.name == "ChatEntry")
-            .unwrap();
+        let chat_entry = module.structs.iter().find(|s| s.name == "ChatEntry").unwrap();
         assert_eq!(chat_entry.fields.len(), 10);
 
         assert_eq!(chat_entry.fields[0].name, "id");
@@ -740,45 +689,22 @@ mod tests {
         assert_eq!(chat_entry.fields[1].name, "kind");
         assert_eq!(chat_entry.fields[1].ty, FieldType::Enum("ChatKind".into()));
 
-        let parent = chat_entry
-            .fields
-            .iter()
-            .find(|f| f.name == "parent_id")
-            .unwrap();
+        let parent = chat_entry.fields.iter().find(|f| f.name == "parent_id").unwrap();
         assert_eq!(parent.ty, FieldType::OptionalU32);
 
-        let title = chat_entry
-            .fields
-            .iter()
-            .find(|f| f.name == "title")
-            .unwrap();
+        let title = chat_entry.fields.iter().find(|f| f.name == "title").unwrap();
         assert_eq!(title.ty, FieldType::OptionalString);
 
-        let last_msg = chat_entry
-            .fields
-            .iter()
-            .find(|f| f.name == "last_message")
-            .unwrap();
-        assert_eq!(
-            last_msg.ty,
-            FieldType::OptionalStruct("LastMessagePreview".into())
-        );
+        let last_msg = chat_entry.fields.iter().find(|f| f.name == "last_message").unwrap();
+        assert_eq!(last_msg.ty, FieldType::OptionalStruct("LastMessagePreview".into()));
     }
 
     #[test]
     fn updatable_string_fields() {
         let module = parse_protocol(&protocol_src()).unwrap();
 
-        let update_chat = module
-            .structs
-            .iter()
-            .find(|s| s.name == "UpdateChatPayload")
-            .unwrap();
-        let title = update_chat
-            .fields
-            .iter()
-            .find(|f| f.name == "title")
-            .unwrap();
+        let update_chat = module.structs.iter().find(|s| s.name == "UpdateChatPayload").unwrap();
+        let title = update_chat.fields.iter().find(|f| f.name == "title").unwrap();
         assert_eq!(title.ty, FieldType::UpdatableString);
 
         let update_profile = module
@@ -786,11 +712,7 @@ mod tests {
             .iter()
             .find(|s| s.name == "UpdateProfilePayload")
             .unwrap();
-        let username = update_profile
-            .fields
-            .iter()
-            .find(|f| f.name == "username")
-            .unwrap();
+        let username = update_profile.fields.iter().find(|f| f.name == "username").unwrap();
         assert_eq!(username.ty, FieldType::UpdatableString);
     }
 
@@ -798,40 +720,18 @@ mod tests {
     fn optional_bitflags_field() {
         let module = parse_protocol(&protocol_src()).unwrap();
 
-        let member = module
-            .structs
-            .iter()
-            .find(|s| s.name == "ChatMemberEntry")
-            .unwrap();
-        let perms = member
-            .fields
-            .iter()
-            .find(|f| f.name == "permissions")
-            .unwrap();
-        assert_eq!(
-            perms.ty,
-            FieldType::OptionalBitflags("Permission".into())
-        );
+        let member = module.structs.iter().find(|s| s.name == "ChatMemberEntry").unwrap();
+        let perms = member.fields.iter().find(|f| f.name == "permissions").unwrap();
+        assert_eq!(perms.ty, FieldType::OptionalBitflags("Permission".into()));
     }
 
     #[test]
     fn optional_vec_struct_field() {
         let module = parse_protocol(&protocol_src()).unwrap();
 
-        let message = module
-            .structs
-            .iter()
-            .find(|s| s.name == "Message")
-            .unwrap();
-        let rich = message
-            .fields
-            .iter()
-            .find(|f| f.name == "rich_content")
-            .unwrap();
-        assert_eq!(
-            rich.ty,
-            FieldType::OptionalVecStruct("RichSpan".into())
-        );
+        let message = module.structs.iter().find(|s| s.name == "Message").unwrap();
+        let rich = message.fields.iter().find(|f| f.name == "rich_content").unwrap();
+        assert_eq!(rich.ty, FieldType::OptionalVecStruct("RichSpan".into()));
     }
 
     #[test]
@@ -846,11 +746,7 @@ mod tests {
         assert!(names.contains(&"AckPayload"));
 
         // MemberAction has mixed variant kinds.
-        let action = module
-            .tagged_enums
-            .iter()
-            .find(|t| t.name == "MemberAction")
-            .unwrap();
+        let action = module.tagged_enums.iter().find(|t| t.name == "MemberAction").unwrap();
         assert_eq!(action.variants.len(), 6);
 
         let kick = action.variants.iter().find(|v| v.name == "Kick").unwrap();
@@ -859,11 +755,7 @@ mod tests {
         let mute = action.variants.iter().find(|v| v.name == "Mute").unwrap();
         assert!(matches!(mute.kind, VariantKind::Struct(_)));
 
-        let change_role = action
-            .variants
-            .iter()
-            .find(|v| v.name == "ChangeRole")
-            .unwrap();
+        let change_role = action.variants.iter().find(|v| v.name == "ChangeRole").unwrap();
         if let VariantKind::Tuple(types) = &change_role.kind {
             assert_eq!(types.len(), 1);
             assert_eq!(types[0], FieldType::Enum("ChatRole".into()));
@@ -876,20 +768,12 @@ mod tests {
     fn constants() {
         let module = parse_protocol(&protocol_src()).unwrap();
 
-        assert_eq!(module.constants.len(), 5);
+        assert_eq!(module.constants.len(), 7);
 
-        let version = module
-            .constants
-            .iter()
-            .find(|c| c.name == "PROTOCOL_VERSION")
-            .unwrap();
+        let version = module.constants.iter().find(|c| c.name == "PROTOCOL_VERSION").unwrap();
         assert_eq!(version.ty, FieldType::U8);
 
-        let max_ts = module
-            .constants
-            .iter()
-            .find(|c| c.name == "MAX_TIMESTAMP")
-            .unwrap();
+        let max_ts = module.constants.iter().find(|c| c.name == "MAX_TIMESTAMP").unwrap();
         assert_eq!(max_ts.ty, FieldType::I64);
 
         let mask = module
@@ -915,26 +799,15 @@ mod tests {
 
         assert!(!module.structs.iter().any(|s| s.name == "Frame"));
         assert!(!module.structs.iter().any(|s| s.name == "FrameHeader"));
-        assert!(!module
-            .tagged_enums
-            .iter()
-            .any(|t| t.name == "FramePayload"));
+        assert!(!module.tagged_enums.iter().any(|t| t.name == "FramePayload"));
     }
 
     #[test]
     fn uuid_field_type() {
         let module = parse_protocol(&protocol_src()).unwrap();
 
-        let hello = module
-            .structs
-            .iter()
-            .find(|s| s.name == "HelloPayload")
-            .unwrap();
-        let device_id = hello
-            .fields
-            .iter()
-            .find(|f| f.name == "device_id")
-            .unwrap();
+        let hello = module.structs.iter().find(|s| s.name == "HelloPayload").unwrap();
+        let device_id = hello.fields.iter().find(|f| f.name == "device_id").unwrap();
         assert_eq!(device_id.ty, FieldType::Uuid);
     }
 
@@ -942,40 +815,16 @@ mod tests {
     fn vec_field_types() {
         let module = parse_protocol(&protocol_src()).unwrap();
 
-        let get_presence = module
-            .structs
-            .iter()
-            .find(|s| s.name == "GetPresencePayload")
-            .unwrap();
-        let user_ids = get_presence
-            .fields
-            .iter()
-            .find(|f| f.name == "user_ids")
-            .unwrap();
+        let get_presence = module.structs.iter().find(|s| s.name == "GetPresencePayload").unwrap();
+        let user_ids = get_presence.fields.iter().find(|f| f.name == "user_ids").unwrap();
         assert_eq!(user_ids.ty, FieldType::VecU32);
 
-        let subscribe = module
-            .structs
-            .iter()
-            .find(|s| s.name == "SubscribePayload")
-            .unwrap();
-        let channels = subscribe
-            .fields
-            .iter()
-            .find(|f| f.name == "channels")
-            .unwrap();
+        let subscribe = module.structs.iter().find(|s| s.name == "SubscribePayload").unwrap();
+        let channels = subscribe.fields.iter().find(|f| f.name == "channels").unwrap();
         assert_eq!(channels.ty, FieldType::VecString);
 
-        let msg_batch = module
-            .structs
-            .iter()
-            .find(|s| s.name == "MessageBatch")
-            .unwrap();
-        let messages = msg_batch
-            .fields
-            .iter()
-            .find(|f| f.name == "messages")
-            .unwrap();
+        let msg_batch = module.structs.iter().find(|s| s.name == "MessageBatch").unwrap();
+        let messages = msg_batch.fields.iter().find(|f| f.name == "messages").unwrap();
         assert_eq!(messages.ty, FieldType::VecStruct("Message".into()));
     }
 }

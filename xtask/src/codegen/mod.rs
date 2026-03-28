@@ -1,5 +1,4 @@
 /// Code generation orchestrator: parse → IR → generate → format.
-
 pub(crate) mod dart;
 pub(crate) mod ir;
 pub(crate) mod parser;
@@ -59,26 +58,26 @@ pub(crate) fn run(workspace_root: &Path, check: bool) -> ExitCode {
 
 /// Run in check mode: generate to a temp dir, format, and compare with existing.
 fn run_check(workspace_root: &Path, ir: &ir::ParsedModule) -> ExitCode {
-    let tmp = std::env::temp_dir().join("chat_codegen_check");
+    let codegen_check_dir = std::env::temp_dir().join("chat_codegen_check");
 
     // Clean up any previous run
-    let _ = fs::remove_dir_all(&tmp);
-    fs::create_dir_all(&tmp).expect("failed to create temp dir");
+    let _ = fs::remove_dir_all(&codegen_check_dir);
+    fs::create_dir_all(&codegen_check_dir).expect("failed to create temp dir");
 
-    let tmp_dart = tmp.join("chat_core_dart");
-    let tmp_ts = tmp.join("chat_core_ts");
+    let tmp_dart = codegen_check_dir.join("chat_core_dart");
+    let tmp_ts = codegen_check_dir.join("chat_core_ts");
 
     eprintln!("Generating to temp directory for comparison...");
 
     if let Err(e) = dart::generate(ir, &tmp_dart) {
         eprintln!("Dart generation error: {e}");
-        let _ = fs::remove_dir_all(&tmp);
+        let _ = fs::remove_dir_all(&codegen_check_dir);
         return ExitCode::FAILURE;
     }
 
     if let Err(e) = typescript::generate(ir, &tmp_ts) {
         eprintln!("TypeScript generation error: {e}");
-        let _ = fs::remove_dir_all(&tmp);
+        let _ = fs::remove_dir_all(&codegen_check_dir);
         return ExitCode::FAILURE;
     }
 
@@ -94,7 +93,7 @@ fn run_check(workspace_root: &Path, ir: &ir::ParsedModule) -> ExitCode {
     compare_dirs(&tmp_dart, &existing_dart, &tmp_dart, &mut diffs);
     compare_dirs(&tmp_ts, &existing_ts, &tmp_ts, &mut diffs);
 
-    let _ = fs::remove_dir_all(&tmp);
+    let _ = fs::remove_dir_all(&codegen_check_dir);
 
     if diffs.is_empty() {
         eprintln!("codegen --check: all generated files up to date.");
@@ -104,10 +103,7 @@ fn run_check(workspace_root: &Path, ir: &ir::ParsedModule) -> ExitCode {
         for d in &diffs {
             eprintln!("  {d}");
         }
-        eprintln!(
-            "\n{} file(s) differ. Run `cargo xtask codegen` to update.",
-            diffs.len()
-        );
+        eprintln!("\n{} file(s) differ. Run `cargo xtask codegen` to update.", diffs.len());
         ExitCode::FAILURE
     }
 }
@@ -168,11 +164,7 @@ fn format_ts(dir: &Path) {
     ];
     args.extend(globs);
 
-    match Command::new("npx")
-        .args(&args)
-        .current_dir(dir)
-        .status()
-    {
+    match Command::new("npx").args(&args).current_dir(dir).status() {
         Ok(s) if !s.success() => eprintln!("Warning: prettier format failed"),
         Err(_) => eprintln!("Warning: npx not found, skipping format"),
         _ => {}

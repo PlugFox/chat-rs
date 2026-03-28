@@ -162,14 +162,12 @@ fn to_snake_case(s: &str) -> String {
 fn to_camel_case(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut cap_next = false;
-    for (i, c) in s.chars().enumerate() {
+    for c in s.chars() {
         if c == '_' {
             cap_next = true;
         } else if cap_next {
             out.push(c.to_ascii_uppercase());
             cap_next = false;
-        } else if i == 0 {
-            out.push(c.to_ascii_lowercase());
         } else {
             out.push(c.to_ascii_lowercase());
         }

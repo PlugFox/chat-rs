@@ -2,7 +2,6 @@
 ///
 /// These types capture everything needed to emit Dart and TypeScript
 /// from parsed Rust protocol types.
-
 /// A parsed Rust source module.
 #[derive(Debug, Default)]
 pub(crate) struct ParsedModule {
@@ -50,6 +49,7 @@ pub(crate) struct BitflagsDef {
 pub(crate) struct FlagEntry {
     pub name: String,
     pub doc: String,
+    #[allow(dead_code)]
     pub value: u64,
     /// Preserved expression string for codegen (e.g. `1 << 10`).
     pub value_expr: String,

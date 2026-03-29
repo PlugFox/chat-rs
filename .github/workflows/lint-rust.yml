@@ -65,6 +65,23 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: chat
+          POSTGRES_PASSWORD: chat
+          POSTGRES_DB: chat_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chat -d chat_db"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+          --tmpfs /var/lib/postgresql/data
+    env:
+      DATABASE_URL: postgres://chat:chat@localhost/chat_db
     steps:
       - uses: actions/checkout@v4
         with:

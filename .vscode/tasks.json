@@ -633,6 +633,121 @@
                 "clear": true
             }
         },
+        // ── Dev Environment ────────────────────────────────────
+        {
+            "label": "dev:up",
+            "detail": "Start dev services (PostgreSQL via Docker Compose)",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "dev",
+                "up"
+            ],
+            "icon": {
+                "id": "database",
+                "color": "terminal.ansiGreen"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "dev:down",
+            "detail": "Stop dev services",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "dev",
+                "down"
+            ],
+            "icon": {
+                "id": "debug-stop",
+                "color": "terminal.ansiRed"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "dev:reset",
+            "detail": "Reset dev database (fresh start)",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "dev",
+                "reset"
+            ],
+            "icon": {
+                "id": "refresh",
+                "color": "terminal.ansiYellow"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "dev:psql",
+            "detail": "Open psql shell to dev database",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "dev",
+                "psql"
+            ],
+            "icon": {
+                "id": "terminal",
+                "color": "terminal.ansiBlue"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "dev:logs",
+            "detail": "Follow dev service logs",
+            "type": "cargo",
+            "command": "run",
+            "args": [
+                "-p",
+                "xtask",
+                "--",
+                "dev",
+                "logs"
+            ],
+            "icon": {
+                "id": "output",
+                "color": "terminal.ansiCyan"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "isBackground": true
+        },
         // ── Dart ──────────────────────────────────────────────
         {
             "label": "dart:test",

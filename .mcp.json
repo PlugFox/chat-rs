@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "mcp-sql",
+      "args": [
+        "--url",
+        "postgres://chat:chat@localhost/chat_db"
+      ]
+    }
+  }
+}

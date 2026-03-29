@@ -4,6 +4,7 @@
 mod check;
 mod ci;
 mod codegen;
+mod dev;
 
 use std::env;
 use std::process::ExitCode;
@@ -26,6 +27,7 @@ fn main() -> ExitCode {
             let is_check = args.iter().any(|a| a == "--check");
             codegen::run(&workspace_root, is_check)
         }
+        Some("dev") => dev::dev(&args[1..]),
         Some("help") | None => {
             print_help();
             ExitCode::SUCCESS
@@ -52,7 +54,9 @@ Tasks:
               BASE defaults to 'develop' (or 'master' if on develop).
               --fix  Auto-fix formatting, lints, and regenerate code.
   codegen     Generate Dart & TypeScript packages from chat_protocol
-              --check  Verify generated code is up to date (CI mode)"
+              --check  Verify generated code is up to date (CI mode)
+  dev         Manage dev services (PostgreSQL via Docker Compose)
+              Subcommands: up, down, reset, status, psql, logs"
     );
 }
 

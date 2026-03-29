@@ -1,0 +1,43 @@
+# Development configuration.
+# Uses Docker Compose PostgreSQL from compose.yml.
+# DO NOT use in production.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+ws_send_buffer_size = 256
+
+[database]
+url = "postgres://chat:chat@localhost/chat_db"
+max_connections = 10
+
+[auth]
+jwt_secret = "dev-secret-do-not-use-in-production"
+
+[limits]
+max_message_content_length = 4096
+max_extra_size = 4096
+max_frame_size = 32768
+max_rich_content_size = 8192
+max_attachment_size = 52428800
+max_attachments_per_message = 10
+
+[rate_limits]
+connections_per_minute_per_ip = 60
+connections_burst = 10
+messages_per_minute_per_chat = 120
+messages_burst = 20
+commands_per_minute = 120
+commands_burst = 20
+
+[cluster]
+enabled = false
+
+[webhooks]
+enabled = false
+
+[storage]
+enabled = false
+
+[license]
+key = ""

@@ -8,6 +8,10 @@
 ## Build & Run
 
 ```bash
+cargo xtask dev up                   # Start PostgreSQL (Docker Compose)
+cargo xtask dev down                 # Stop services
+cargo xtask dev reset                # Reset database (fresh start)
+cargo xtask dev psql                 # Open psql shell
 cargo xtask check                    # Clippy + fmt + tests
 cargo xtask fmt                      # Format workspace
 cargo xtask test                     # Run all tests

@@ -13,10 +13,14 @@ defaults:
   run:
     working-directory: packages/chat_core_ts
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Type Check & Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +37,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:

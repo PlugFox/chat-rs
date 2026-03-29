@@ -39,6 +39,21 @@ cargo run -p chat_server             # Run server (dev)
 - `chat_protocol` uses `thiserror` for typed errors. `chat_server` uses `anyhow` for application errors.
 - All IDs in wire protocol are `u32`. External string user IDs are mapped to internal `u32` on the server.
 
+## Codegen (Dart & TypeScript clients)
+
+When modifying `chat_protocol` types used in wire format:
+
+1. Update the Rust types first, ensure `cargo check` passes.
+2. Run `cargo xtask codegen` to regenerate Dart/TS client packages.
+3. Verify generated code: `cd packages/chat_core_dart && dart analyze` and `cd packages/chat_core_ts && npm run check`.
+4. See [docs/codegen.md](docs/codegen.md) for architecture and IR details.
+
+## Database Migrations
+
+- **Server (PostgreSQL):** Migrations live in `crates/chat_server/migrations/`. Use `sqlx migrate add <name>` to create, `sqlx migrate run` to apply. All queries are compile-time checked via `sqlx::query!`.
+- **Client (SQLite):** Schema lives in the separate `chat_client_rs` repo. Uses `rusqlite_migration` with `PRAGMA user_version`.
+- Always test migrations against a fresh database before committing.
+
 ## Testing
 
 - Write unit tests (`#[cfg(test)]`) for non-trivial pure logic.

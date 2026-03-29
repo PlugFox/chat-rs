@@ -1,0 +1,5 @@
+[advisories]
+# rsa is a phantom dependency — pulled unconditionally by sqlx-macros-core
+# for compile-time query checking, but never compiled or used at runtime.
+# No patch available since 2023. Safe to ignore.
+ignore = ["RUSTSEC-2023-0071"]

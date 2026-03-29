@@ -7,7 +7,8 @@ mod common;
 
 use std::time::Duration;
 
-use chat_protocol::types::FramePayload;
+use chat_protocol::codec::encode_frame;
+use chat_protocol::types::{ErrorCode, Frame, FramePayload};
 use uuid::Uuid;
 
 use common::{TestClient, TestServer};
@@ -124,8 +125,92 @@ async fn unauthenticated_send_message_rejected() {
     let resp = client.recv_frame(Duration::from_secs(5)).await.expect("error frame");
     match resp.payload {
         FramePayload::Error(e) => {
-            assert_eq!(e.code, chat_protocol::types::ErrorCode::Unauthorized);
+            assert_eq!(e.code, ErrorCode::Unauthorized);
         }
         other => panic!("expected Error, got {other:?}"),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Frame dispatch tests
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn ping_returns_pong() {
+    let server = TestServer::start().await;
+    let mut client = TestClient::connect(&server.ws_url()).await;
+    client.hello(&server.jwt_for("alice_ext"), Uuid::new_v4()).await;
+
+    // Send Ping with seq=42.
+    let ping = Frame {
+        seq: 42,
+        event_seq: 0,
+        payload: FramePayload::Ping,
+    };
+    let mut buf = Vec::new();
+    encode_frame(&mut buf, &ping).unwrap();
+    use futures_util::SinkExt;
+    client
+        .ws_tx
+        .send(tokio_tungstenite::tungstenite::Message::Binary(buf.into()))
+        .await
+        .unwrap();
+
+    let resp = client.recv_frame(Duration::from_secs(5)).await.expect("pong frame");
+    assert!(matches!(resp.payload, FramePayload::Pong));
+    assert_eq!(resp.seq, 42, "pong should carry same seq as ping");
+}
+
+#[tokio::test]
+async fn unknown_command_returns_error() {
+    let server = TestServer::start().await;
+    let mut client = TestClient::connect(&server.ws_url()).await;
+    client.hello(&server.jwt_for("alice_ext"), Uuid::new_v4()).await;
+
+    // Send GetPresence (not implemented in M1) — should get UnknownCommand.
+    let frame = Frame {
+        seq: 7,
+        event_seq: 0,
+        payload: FramePayload::GetPresence(chat_protocol::types::GetPresencePayload { user_ids: vec![1, 2] }),
+    };
+    let mut buf = Vec::new();
+    encode_frame(&mut buf, &frame).unwrap();
+    use futures_util::SinkExt;
+    client
+        .ws_tx
+        .send(tokio_tungstenite::tungstenite::Message::Binary(buf.into()))
+        .await
+        .unwrap();
+
+    let resp = client.recv_frame(Duration::from_secs(5)).await.expect("error frame");
+    match resp.payload {
+        FramePayload::Error(e) => {
+            assert_eq!(e.code, ErrorCode::UnknownCommand);
+        }
+        other => panic!("expected Error(UnknownCommand), got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn malformed_binary_returns_error() {
+    let server = TestServer::start().await;
+    let mut client = TestClient::connect(&server.ws_url()).await;
+
+    // Send garbage bytes — should get MalformedFrame error.
+    use futures_util::SinkExt;
+    client
+        .ws_tx
+        .send(tokio_tungstenite::tungstenite::Message::Binary(
+            vec![0xFF, 0x00, 0x01].into(),
+        ))
+        .await
+        .unwrap();
+
+    let resp = client.recv_frame(Duration::from_secs(5)).await.expect("error frame");
+    match resp.payload {
+        FramePayload::Error(e) => {
+            assert_eq!(e.code, ErrorCode::MalformedFrame);
+        }
+        other => panic!("expected Error(MalformedFrame), got {other:?}"),
     }
 }

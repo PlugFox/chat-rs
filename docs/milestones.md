@@ -87,28 +87,32 @@ M8  Scaling          ████████████████  Redis clu
 
 #### Unit — Server
 - [x] Config parsing: valid config, missing fields с defaults, invalid values (6 tests)
-- [ ] JWT verification: valid token, expired, invalid signature, malformed
-- [ ] Frame dispatch: known kinds route correctly, unknown → Error frame
+- [x] JWT verification: valid token, expired, invalid signature, malformed, empty, missing sub (6 tests)
+- [x] Frame dispatch: ping→pong, unknown command→Error, malformed→Error (integration tests)
 
 #### Integration
 - [x] **Two-client message delivery**: Alice и Bob (`TestClient`) подключаются к test server, Alice отправляет сообщение, Bob получает `MessageNew` event
 - [x] **Idempotency**: клиент отправляет дважды с одним key → одно сообщение на сервере (проверка в DB)
 - [x] **Graceful shutdown**: сервер закрывает соединения → клиент видит disconnect
 - [x] **Unauthenticated rejection**: команда без Hello → `ErrorCode::Unauthorized`
+- [x] **Ping/Pong**: ping с seq=42 → pong с seq=42
+- [x] **Unknown command**: GetPresence → `ErrorCode::UnknownCommand`
+- [x] **Malformed frame**: garbage bytes → `ErrorCode::MalformedFrame`
 
 #### Property-based
-- [ ] Proptest: произвольные WS frame sequences не паникуют сервер
+- [x] Proptest: произвольные byte sequences не паникуют сервер (50 cases)
+- [x] Proptest: valid header + garbage payload не паникуют сервер (30 cases)
 
 ### Benchmarks
 
-- [ ] Server: messages/sec throughput (1 sender, 1 receiver, in-memory)
-- [ ] Server: connection setup latency (Hello → Welcome)
+- [x] Server: send_message_roundtrip — ~2.8ms (sender→DB→ack + receiver gets event)
+- [x] Server: connection_hello_welcome — ~1.6ms (WS connect + Hello → Welcome)
 
 ### Documentation
 
 - [x] `docs/server.md` — обновлён с реальной структурой модулей
 - [x] `docs/database.md` — обновлён с финальной схемой PostgreSQL (BIGINT timestamps)
-- [ ] Rustdoc для public API обоих crate'ов (`chat_protocol`, `chat_server`)
+- [x] Rustdoc для public API обоих crate'ов (`chat_protocol`, `chat_server`)
 - [x] `config.example.toml` — финальная версия с комментариями
 
 ### Acceptance Criteria
@@ -118,8 +122,8 @@ M8  Scaling          ████████████████  Redis clu
 - [x] `TestClient` подключается, отправляет сообщение, получает Ack
 - [x] `cargo clippy --workspace --tests -D warnings` — чисто
 - [x] `cargo fmt --all --check` — чисто
-- [x] Все тесты workspace зелёные (unit + integration + protocol)
-- [ ] Benchmarks baseline записаны
+- [x] Все тесты workspace зелёные (166 tests: 12 unit + 7 integration + 2 proptest + 132 protocol + 13 xtask)
+- [x] Benchmarks baseline записаны
 
 ---
 

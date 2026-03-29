@@ -16,6 +16,7 @@
       "Bash(git show *)",
       "Bash(git status *)",
       "Bash(cargo *)",
+      "Bash(gh *)",
       "Bash(dart *)",
       "Bash(npm *)",
       "Bash(npx *)",

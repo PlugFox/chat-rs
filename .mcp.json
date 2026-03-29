@@ -6,6 +6,12 @@
         "--url",
         "postgres://chat:chat@localhost/chat_db"
       ]
+    },
+    "github": {
+      "command": "gh",
+      "args": [
+        "mcp-server"
+      ]
     }
   }
 }

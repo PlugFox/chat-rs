@@ -104,6 +104,7 @@ jobs:
           sparse-checkout: |
             Cargo.toml
             Cargo.lock
+            .cargo
       - uses: rustsec/audit-check@v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

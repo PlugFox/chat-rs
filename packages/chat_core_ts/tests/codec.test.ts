@@ -1155,6 +1155,18 @@ describe("LoadMessagesPayload codec", () => {
     const decoded = decodeLoadMessagesPayload(new ProtocolReader(w.toBytes()));
     expect(decoded).toEqual(original);
   });
+  it("Chunk roundtrip", () => {
+    const original: LoadMessagesPayload = {
+      type: "chunk" as const,
+      chatId: 100000,
+      chunkId: 100000,
+      sinceTs: 1234567890,
+    };
+    const w = new ProtocolWriter();
+    encodeLoadMessagesPayload(w, original);
+    const decoded = decodeLoadMessagesPayload(new ProtocolReader(w.toBytes()));
+    expect(decoded).toEqual(original);
+  });
 });
 
 describe("MemberAction codec", () => {

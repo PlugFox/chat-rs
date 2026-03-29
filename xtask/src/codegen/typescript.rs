@@ -194,6 +194,31 @@ fn to_lower_camel(s: &str) -> String {
     }
 }
 
+/// Replace `UPPER_SNAKE_CASE` identifiers in an expression with `camelCase`.
+fn replace_upper_snake_idents(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_ascii_uppercase() {
+            let start = i;
+            while i < chars.len() && (chars[i].is_ascii_uppercase() || chars[i].is_ascii_digit() || chars[i] == '_') {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            if word.contains('_') || word.len() >= 2 {
+                result.push_str(&to_camel_case(&word));
+            } else {
+                result.push_str(&word);
+            }
+        } else {
+            result.push(chars[i]);
+            i += 1;
+        }
+    }
+    result
+}
+
 /// Strip Rust integer type suffixes for TS compatibility.
 fn clean_rust_expr(expr: &str) -> String {
     let mut s = expr.to_string();
@@ -202,7 +227,8 @@ fn clean_rust_expr(expr: &str) -> String {
     ] {
         s = s.replace(suffix, "");
     }
-    s
+    // Convert UPPER_SNAKE_CASE identifiers to camelCase (e.g. CHUNK_SHIFT → chunkShift).
+    replace_upper_snake_idents(&s)
 }
 
 // ---------------------------------------------------------------------------
@@ -1454,6 +1480,7 @@ fn emit_reader_ts() -> String {
     format!(
         "{HEADER}\n\
 import {{ CodecError }} from './error.js';\n\
+import {{ maxTimestamp }} from '../constants.js';\n\
 \n\
 const textDecoder = new TextDecoder();\n\
 \n\
@@ -1500,7 +1527,7 @@ export class ProtocolReader {{\n\
 \n\
   readTimestamp(): number {{\n\
     const v = this.readI64();\n\
-    if (v < 0 || v > 2199023255551) throw new CodecError(`timestamp out of range: ${{v}}`);\n\
+    if (v < 0 || v > maxTimestamp) throw new CodecError(`timestamp out of range: ${{v}}`);\n\
     return v;\n\
   }}\n\
 \n\
@@ -1596,6 +1623,7 @@ fn emit_writer_ts() -> String {
     format!(
         "{HEADER}\n\
 import {{ CodecError }} from './error.js';\n\
+import {{ maxTimestamp }} from '../constants.js';\n\
 \n\
 const textEncoder = new TextEncoder();\n\
 \n\
@@ -1639,7 +1667,7 @@ export class ProtocolWriter {{\n\
   }}\n\
 \n\
   writeTimestamp(v: number): void {{\n\
-    if (v < 0 || v > 2199023255551) throw new CodecError(`timestamp out of range: ${{v}}`);\n\
+    if (v < 0 || v > maxTimestamp) throw new CodecError(`timestamp out of range: ${{v}}`);\n\
     this.writeI64(v);\n\
   }}\n\
 \n\

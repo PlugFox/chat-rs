@@ -1498,6 +1498,20 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
     });
+    test('Chunk equality', () {
+      final a = LoadMessagesChunk(
+        chatId: 100000,
+        chunkId: 100000,
+        sinceTs: 1234567890,
+      );
+      final b = LoadMessagesChunk(
+        chatId: 100000,
+        chunkId: 100000,
+        sinceTs: 1234567890,
+      );
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
   });
 
   group('MemberAction', () {

@@ -8,12 +8,12 @@
 //!
 //! ## Wire Format
 //!
-//! All values are little-endian. Every WS binary frame starts with a 5-byte header:
+//! All values are little-endian. Every WS binary frame starts with a 9-byte header:
 //!
 //! ```text
-//! ┌──────────┬───────────┬──────────────────┐
-//! │ kind: u8 │  seq: u32 │ payload: bytes   │
-//! └──────────┴───────────┴──────────────────┘
+//! ┌──────────┬───────────┬────────────────┬──────────────────┐
+//! │ kind: u8 │  seq: u32 │ event_seq: u32 │ payload: bytes   │
+//! └──────────┴───────────┴────────────────┴──────────────────┘
 //! ```
 //!
 //! See `docs/codec.md` for the complete wire format specification.

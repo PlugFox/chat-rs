@@ -28,9 +28,16 @@ pub fn decode_message_batch(buf: &mut impl Buf) -> Result<MessageBatch, CodecErr
     Ok(MessageBatch { messages, has_more })
 }
 
-/// Encode a single `Message` (35-byte fixed header + variable).
+/// Encode a single `Message`.
+///
+/// Layout (fixed-size fields, then variable-size):
+/// - id(4) + chat_id(4) + sender_id(4) + created_at(8) + updated_at(8) +
+///   kind(1) + flags(2) = 31 bytes fixed
+/// - reply_to: u8 flag [+ optional u32] (1 or 5 bytes)
+/// - content: u32 length + UTF-8 bytes
+/// - rich_content: u32 length + encoded spans (0 = absent)
+/// - extra: optional string (u32 length + UTF-8 bytes)
 pub fn encode_message(buf: &mut impl BufMut, msg: &Message) -> Result<(), CodecError> {
-    // Fixed header (35 bytes)
     write_u32(buf, msg.id);
     write_u32(buf, msg.chat_id);
     write_u32(buf, msg.sender_id);

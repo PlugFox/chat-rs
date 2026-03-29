@@ -188,6 +188,33 @@ fn to_lower_camel(s: &str) -> String {
     }
 }
 
+/// Replace `UPPER_SNAKE_CASE` identifiers in an expression with `camelCase`.
+fn replace_upper_snake_idents(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        // Check for start of an UPPER_SNAKE identifier (A-Z followed by A-Z, 0-9, or _).
+        if chars[i].is_ascii_uppercase() {
+            let start = i;
+            while i < chars.len() && (chars[i].is_ascii_uppercase() || chars[i].is_ascii_digit() || chars[i] == '_') {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            // Must contain at least one underscore or be 2+ uppercase chars to qualify.
+            if word.contains('_') || word.len() >= 2 {
+                result.push_str(&to_camel_case(&word));
+            } else {
+                result.push_str(&word);
+            }
+        } else {
+            result.push(chars[i]);
+            i += 1;
+        }
+    }
+    result
+}
+
 /// Strip Rust integer type suffixes for Dart compatibility.
 fn clean_rust_expr(expr: &str) -> String {
     let mut s = expr.to_string();
@@ -196,7 +223,8 @@ fn clean_rust_expr(expr: &str) -> String {
     ] {
         s = s.replace(suffix, "");
     }
-    s
+    // Convert UPPER_SNAKE_CASE identifiers to camelCase (e.g. CHUNK_SHIFT → chunkShift).
+    replace_upper_snake_idents(&s)
 }
 
 // ---------------------------------------------------------------------------
@@ -1438,6 +1466,8 @@ fn emit_reader_dart() -> String {
 import 'dart:convert';\n\
 import 'dart:typed_data';\n\
 \n\
+import 'package:chat_core/src/protocol_constants.dart';\n\
+\n\
 import 'error.dart';\n\
 \n\
 class ProtocolReader {{\n\
@@ -1480,7 +1510,7 @@ class ProtocolReader {{\n\
 \n\
   int readTimestamp() {{\n\
     final v = readI64();\n\
-    if (v < 0 || v > 2199023255551) throw CodecError('timestamp out of range: $v');\n\
+    if (v < 0 || v > maxTimestamp) throw CodecError('timestamp out of range: $v');\n\
     return v;\n\
   }}\n\
 \n\
@@ -1579,6 +1609,8 @@ fn emit_writer_dart() -> String {
 import 'dart:convert';\n\
 import 'dart:typed_data';\n\
 \n\
+import 'package:chat_core/src/protocol_constants.dart';\n\
+\n\
 import 'error.dart';\n\
 \n\
 class ProtocolWriter {{\n\
@@ -1623,7 +1655,7 @@ class ProtocolWriter {{\n\
   }}\n\
 \n\
   void writeTimestamp(int v) {{\n\
-    if (v < 0 || v > 2199023255551) throw CodecError('timestamp out of range: $v');\n\
+    if (v < 0 || v > maxTimestamp) throw CodecError('timestamp out of range: $v');\n\
     writeI64(v);\n\
   }}\n\
 \n\

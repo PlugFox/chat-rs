@@ -86,7 +86,7 @@ MessageBatch:
 `has_more`: 1 = more messages exist beyond this batch, 0 = this is the last page.
 
 ```
-Message (fixed header 40 bytes + variable):
+Message (31 bytes fixed + variable-size reply_to, content, rich, extra):
 ┌─────────┬──────────┬───────────┬─────────┬──────────┬────────┬──────────┬──────────────────────────────┬─────────────┬──────────────────┐
 │ id: u32 │ chat: u32│sender: u32│crtd_at:i64│upd_at:i64│kind: u8│flags: u16│ reply_to: u8 [+ u32]         │ content_len │ content (UTF-8)  │
 │  4 bytes│  4 bytes │  4 bytes  │  8 bytes│  8 bytes │  1 byte│  2 bytes │ 1 byte   [+ 4 bytes]         │   u32 4bytes│  N bytes         │

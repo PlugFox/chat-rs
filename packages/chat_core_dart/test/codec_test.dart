@@ -916,6 +916,17 @@ void main() {
       final decoded = decodeLoadMessagesPayload(ProtocolReader(w.toBytes()));
       expect(decoded, equals(original));
     });
+    test('Chunk roundtrip', () {
+      final original = LoadMessagesChunk(
+        chatId: 100000,
+        chunkId: 100000,
+        sinceTs: 1234567890,
+      );
+      final w = ProtocolWriter();
+      encodeLoadMessagesPayload(w, original);
+      final decoded = decodeLoadMessagesPayload(ProtocolReader(w.toBytes()));
+      expect(decoded, equals(original));
+    });
   });
 
   group('MemberAction codec', () {

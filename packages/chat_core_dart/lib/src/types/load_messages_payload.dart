@@ -89,6 +89,9 @@ class LoadMessagesRangeCheck extends LoadMessagesPayload {
 }
 
 /// Chunk load/update (mode 2).
+///
+/// Request all messages in a chunk, or only those updated after `since_ts`.
+/// `chunk_id = message_id >> CHUNK_SHIFT`. See [`CHUNK_SHIFT`](crate::CHUNK_SHIFT).
 class LoadMessagesChunk extends LoadMessagesPayload {
   const LoadMessagesChunk({
     required this.chatId,

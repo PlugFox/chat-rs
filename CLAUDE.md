@@ -8,6 +8,10 @@
 ## Build & Run
 
 ```bash
+cargo xtask dev up                   # Start PostgreSQL (Docker Compose)
+cargo xtask dev down                 # Stop services
+cargo xtask dev reset                # Reset database (fresh start)
+cargo xtask dev psql                 # Open psql shell
 cargo xtask check                    # Clippy + fmt + tests
 cargo xtask fmt                      # Format workspace
 cargo xtask test                     # Run all tests
@@ -37,7 +41,22 @@ cargo run -p chat_server             # Run server (dev)
 - If docs were missing important details or out of sync — update them before finishing the task.
 - No shell scripts — all automation via `xtask/` (Rust).
 - `chat_protocol` uses `thiserror` for typed errors. `chat_server` uses `anyhow` for application errors.
-- All IDs in wire protocol are `i64`. External string user IDs are mapped to internal `i64` on the server.
+- All IDs in wire protocol are `u32`. External string user IDs are mapped to internal `u32` on the server.
+
+## Codegen (Dart & TypeScript clients)
+
+When modifying `chat_protocol` types used in wire format:
+
+1. Update the Rust types first, ensure `cargo check` passes.
+2. Run `cargo xtask codegen` to regenerate Dart/TS client packages.
+3. Verify generated code: `cd packages/chat_core_dart && dart analyze` and `cd packages/chat_core_ts && npm run check`.
+4. See [docs/codegen.md](docs/codegen.md) for architecture and IR details.
+
+## Database Migrations
+
+- **Server (PostgreSQL):** Migrations live in `crates/chat_server/migrations/`. Use `sqlx migrate add <name>` to create, `sqlx migrate run` to apply. All queries are compile-time checked via `sqlx::query!`.
+- **Client (SQLite):** Schema lives in the separate `chat_client_rs` repo. Uses `rusqlite_migration` with `PRAGMA user_version`.
+- Always test migrations against a fresh database before committing.
 
 ## Testing
 
@@ -61,7 +80,6 @@ cargo run -p chat_server             # Run server (dev)
 
 | Topic                                 | File                                           |
 | ------------------------------------- | ---------------------------------------------- |
-| **Full specification**                | [SPEC.md](SPEC.md)                             |
 | **Project goals & vision**            | [docs/goals.md](docs/goals.md)                 |
 | **Roadmap & milestones**              | [docs/milestones.md](docs/milestones.md)       |
 | Architecture & crate structure        | [docs/architecture.md](docs/architecture.md)   |
@@ -77,3 +95,4 @@ cargo run -p chat_server             # Run server (dev)
 | Performance guidelines                | [docs/performance.md](docs/performance.md)     |
 | Cross-platform notes                  | [docs/crossplatform.md](docs/crossplatform.md) |
 | xtask automation                      | [docs/xtask.md](docs/xtask.md)                 |
+| Future plans & client notes           | [docs/future-plans.md](docs/future-plans.md)   |

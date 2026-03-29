@@ -19,9 +19,11 @@ A **chat** is the container for messages and members. There are three kinds:
 | `parent_id`   | `u8 flag + u32`   | `Option<u32>`    | Parent group ID; present only for channels        |
 | `title`       | `u32 len + UTF-8` | `Option<String>` | Display name; absent for DMs                      |
 | `avatar_url`  | `u32 len + UTF-8` | `Option<String>` | Avatar URL; absent when `len = 0`                 |
-| `last_msg_id` | `u32`             | `u32`            | Highest message ID; doubles as client sync cursor |
-| `created_at`  | `i64`             | `i64`            | Creation timestamp, Unix seconds                  |
-| `updated_at`  | `i64`             | `i64`            | Last modification timestamp, Unix seconds;        |
+| `created_at`  | `i64`             | `i64`            | Creation timestamp, Unix seconds (validated)      |
+| `updated_at`  | `i64`             | `i64`            | Last modification timestamp, Unix seconds         |
+| `last_message`| `u8 flag + fields`| `Option<LastMessagePreview>` | Last message preview; absent for empty chats |
+| `unread_count`| `u32`             | `u32`            | Unread messages (server-computed)             |
+| `member_count`| `u32`             | `u32`            | Total members in this chat                    |
 
 ## ChatKind
 
@@ -39,7 +41,7 @@ pub enum ChatKind {
 ## ChatRole
 
 ```rust
-#[repr(i16)]
+#[repr(u8)]
 #[derive(PartialOrd, Ord)]
 pub enum ChatRole {
     Member    = 0,
@@ -54,9 +56,66 @@ assign a role equal to or higher than their own.
 
 ## Permissions
 
-Per-member permission overrides are stored as `Permission` bitflags (`u32`).
+Per-member permission overrides are stored as `Permission` bitflags (`u32` on the wire,
+`i32` in PostgreSQL — no unsigned types available).
+
 `NULL` in the database means "use role defaults" — see `default_permissions()` in
 `chat_protocol::types`.
+
+```rust
+bitflags! {
+    pub struct Permission: u32 {
+        // Messages
+        const SEND_MESSAGES         = 1 << 0;
+        const SEND_MEDIA            = 1 << 1;
+        const SEND_LINKS            = 1 << 2;
+        const PIN_MESSAGES          = 1 << 3;
+        const EDIT_OWN_MESSAGES     = 1 << 4;
+        const DELETE_OWN_MESSAGES   = 1 << 5;
+
+        // Moderation
+        const DELETE_OTHERS_MESSAGES = 1 << 10;
+        const MUTE_MEMBERS          = 1 << 11;
+        const BAN_MEMBERS           = 1 << 12;
+
+        // Management
+        const INVITE_MEMBERS        = 1 << 20;
+        const KICK_MEMBERS          = 1 << 21;
+        const MANAGE_CHAT_INFO      = 1 << 22;
+        const MANAGE_ROLES          = 1 << 23;
+
+        // Owner
+        const TRANSFER_OWNERSHIP    = 1 << 30;
+        const DELETE_CHAT           = 1 << 31;
+    }
+}
+```
+
+### Default permissions by role
+
+```rust
+fn default_permissions(role: ChatRole, chat_kind: ChatKind) -> Permission {
+    match (role, chat_kind) {
+        (ChatRole::Owner, _) => Permission::all(),
+        (ChatRole::Admin, _) => Permission::SEND_MESSAGES
+            | Permission::SEND_MEDIA | Permission::SEND_LINKS
+            | Permission::PIN_MESSAGES | Permission::EDIT_OWN_MESSAGES
+            | Permission::DELETE_OWN_MESSAGES | Permission::DELETE_OTHERS_MESSAGES
+            | Permission::MUTE_MEMBERS | Permission::BAN_MEMBERS
+            | Permission::INVITE_MEMBERS | Permission::KICK_MEMBERS
+            | Permission::MANAGE_CHAT_INFO | Permission::MANAGE_ROLES,
+        (ChatRole::Moderator, _) => Permission::SEND_MESSAGES
+            | Permission::SEND_MEDIA | Permission::SEND_LINKS
+            | Permission::PIN_MESSAGES | Permission::EDIT_OWN_MESSAGES
+            | Permission::DELETE_OWN_MESSAGES | Permission::DELETE_OTHERS_MESSAGES
+            | Permission::MUTE_MEMBERS,
+        (ChatRole::Member, ChatKind::Channel) => Permission::empty(),
+        (ChatRole::Member, _) => Permission::SEND_MESSAGES
+            | Permission::SEND_MEDIA | Permission::SEND_LINKS
+            | Permission::EDIT_OWN_MESSAGES | Permission::DELETE_OWN_MESSAGES,
+    }
+}
+```
 
 Notable defaults:
 - **Channel / Member** — `Permission::empty()` (read-only by default).
@@ -74,10 +133,10 @@ All values are little-endian. See [codec.md](codec.md) for type mapping.
 Used in `LoadChats` responses and `ChatCreated` / `ChatUpdated` events.
 
 ```
-┌────────┬────────┬──────────────────────────┬──────────────┬─────────────┬─────────────┬────────────────┐
-│id: u32 │kind: u8│parent: u8 [+ parent: u32]│last_msg: u32 │unread: u32  │unread: u32  │title + avatar  │
-│ 4 bytes│ 1 byte │ 1 byte   [+  4 bytes]    │   4 bytes    │  4 bytes    │  4 bytes    │ variable       │
-└────────┴────────┴──────────────────────────┴──────────────┴─────────────┴─────────────┴────────────────┘
+┌────────┬────────┬──────────────────────────┬─────────────┬─────────────┬────────────────┐
+│id: u32 │kind: u8│parent: u8 [+ parent: u32]│created_at   │updated_at   │title + avatar  │
+│ 4 bytes│ 1 byte │ 1 byte   [+  4 bytes]    │  i64 8bytes │  i64 8bytes │ variable       │
+└────────┴────────┴──────────────────────────┴─────────────┴─────────────┴────────────────┘
 ```
 
 `parent` byte: `0` = no parent (DM or Group), `1` = parent follows as `u32`.
@@ -90,7 +149,22 @@ Followed by two length-prefixed strings (each absent when `len = 0`):
 └──────────────┴──────────────┴────────────────┴────────────────┘
 ```
 
-Minimum size: 22 bytes (DM, no strings).
+Followed by last message preview (`u8 flag`: 0 = absent, 1 = preview follows):
+
+```
+┌───────────┬─────────────────────────────────────────────────────────────────┐
+│ flag: u8  │ [id:u32 | sender_id:u32 | created_at:i64 | kind:u8 | flags:u16│
+│           │  | content_preview: String]                                     │
+└───────────┴─────────────────────────────────────────────────────────────────┘
+```
+
+`content_preview` is a server-truncated plain-text snippet (up to 100 bytes, UTF-8 safe).
+
+Followed by: `unread_count: u32`, `member_count: u32`.
+
+Minimum size: 39 bytes (DM, no parent, no strings, no last_message: 4+1+1+8+8+4+4+1+4+4).
+
+Timestamps are validated against codec range (see [codec.md](codec.md#timestamp-validation)).
 
 ### ChatMemberEntry — 6–10 bytes
 
@@ -147,22 +221,24 @@ Request: `chat_id: u32`, `cursor: u32` (0 = first page), `limit: u16`
 
 Response: `Ack` with `next_cursor: u32`, `count: u32`, `entries[count]: ChatMemberEntry`.
 
-### UpdateMemberRole (0x48) Request
+### InviteMembers (0x45)
 
-`chat_id: u32`, `user_id: u32`, `role: u8`
+`chat_id: u32`, `count: u16`, `user_ids[count]: u32`
 
 Response: `Ack` (empty).
 
-### InviteMembers (0x45) / KickMember (0x46)
+### UpdateMember (0x46)
 
-- **Invite**: `chat_id: u32`, `count: u16`, `user_ids[count]: u32`
-- **Kick**: `chat_id: u32`, `user_id: u32`
+`chat_id: u32`, `user_id: u32`, `action: u8` + action-specific payload.
 
-Both return `Ack` (empty).
+See [protocol.md](protocol.md#updatemember-0x46) for action discriminant values
+(Kick=0, Ban=1, Mute=2, ChangeRole=3, UpdatePermissions=4, Unban=5).
+
+Response: `Ack` (empty).
 
 ### ChatUpdated (0x28) Event
 
-Server pushes this when chat metadata changes (title, avatar, `last_msg_id`, `unread_count`).
+Server pushes this when chat metadata changes (title, avatar).
 Payload is a full `ChatEntry` — clients replace their cached copy.
 
 ### ChatCreated (0x29) Event
@@ -170,12 +246,25 @@ Payload is a full `ChatEntry` — clients replace their cached copy.
 Server pushes this when the user is added to a new chat (invited, or DM initiated by
 someone else). Payload is a full `ChatEntry`.
 
+### ChatDeleted (0x2C) Event
+
+Server pushes this when a chat is deleted. Payload: `chat_id: u32`.
+Clients should remove the chat from the chat list and close any open views.
+
+### MemberUpdated (0x2D) Event
+
+Server pushes this when a member's role or permissions change (via `UpdateMember`).
+Payload uses the same wire format as `ChatMemberEntry`:
+`chat_id: u32`, `user_id: u32`, `role: u8`, `perm_flag: u8` [+ `permissions: u32`].
+
+`perm_flag = 0` means use role defaults, `perm_flag = 1` means explicit override follows.
+
 ## Subscription Model
 
 Receiving real-time events for a chat requires an explicit `Subscribe (0x18)` call
 with `chat_id: u32`. The server then pushes:
 `MessageNew`, `MessageEdited`, `MessageDeleted`, `ReceiptUpdate`, `TypingUpdate`,
-`MemberJoined`, `MemberLeft`.
+`MemberJoined`, `MemberLeft`, `MemberUpdated`, `ChatDeleted`.
 
 `Subscribe` does **not** push historical messages — the client loads history separately
 via `LoadMessages`. This keeps the subscription lightweight and avoids redundant data
@@ -183,6 +272,19 @@ on reconnect.
 
 `Unsubscribe (0x19)` is fire-and-forget (no Ack). The client should call it when
 navigating away to stop receiving events for chats not in view.
+
+## Sync Model
+
+The client tracks its own sync cursor locally — the highest message ID it has seen
+per chat. After reconnect, it requests new messages via `LoadMessages` for the chats
+currently in view:
+
+```
+LoadMessages(chat_id, mode=0, direction=newer, anchor_id=<last_known_id>, limit=100)
+```
+
+This is cheaper than the server pushing `last_msg_id` in every `ChatEntry`, because
+the client only syncs chats it actually opens.
 
 ## DM Semantics
 
@@ -206,22 +308,6 @@ a channel without being a member of the parent group (e.g. public read-only chan
 The application layer enforces any desired inheritance rules.
 
 Subscribing to a group does **not** auto-subscribe to its channels.
-
-## Sync Cursor
-
-`last_msg_id` is the highest message ID the server has assigned in this chat. Clients
-store it locally and use it as a sync cursor after reconnect:
-
-```sql
-SELECT * FROM messages WHERE chat_id = ? AND id > ? ORDER BY id ASC
-```
-
-This is why `last_msg_id` must never go backwards — even for soft-deleted messages
-the ID slot is permanently consumed.
-
-`unread_count` is maintained server-side and reset to `0` when the server processes a
-`ReadReceipt` for this chat. Clients should treat it as advisory — the authoritative
-unread count comes from comparing `last_msg_id` with the locally stored read position.
 
 ## Pitfalls
 

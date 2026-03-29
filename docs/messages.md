@@ -6,6 +6,8 @@
 
 `Message` is the core data unit. Messages travel in batches (`MessageBatch`) — as payloads of `SyncBatch` events (real-time push) and `LoadMessages` responses (history load).
 
+Messages are also addressed in fixed-size **chunks** of 64 (`CHUNK_SIZE`). See [protocol.md — Message Chunks](protocol.md#message-chunks) for the chunking scheme and how `LoadMessages` mode 2 uses it.
+
 ## Fields
 
 | Field        | Wire type         | Rust type               | Description                                              |
@@ -13,10 +15,11 @@
 | `id`         | `u32`             | `u32`                   | Sequential per-chat ID; scoped to `chat_id`, starts at 1 |
 | `chat_id`    | `u32`             | `u32`                   | Chat this message belongs to                             |
 | `sender_id`  | `u32`             | `u32`                   | Internal user ID of the sender                           |
-| `created_at` | `i64`             | `i64`                   | Creation timestamp, Unix seconds                         |
-| `updated_at` | `i64`             | `i64`                   | Last modification timestamp, Unix seconds;               |
+| `created_at` | `i64`             | `i64`                   | Creation timestamp, Unix seconds (validated: 0 ≤ v < 2⁴¹)|
+| `updated_at` | `i64`             | `i64`                   | Last modification timestamp, Unix seconds (validated)    |
 | `kind`       | `u8`              | `MessageKind`           | Content type                                             |
 | `flags`      | `u16`             | `MessageFlags`          | Bitfield of message properties                           |
+| `reply_to_id`| `u8 flag + u32`   | `Option<u32>`           | Message being replied to; absent = not a reply           |
 | `content`    | `u32 len + UTF-8` | `String`                | Plain text; empty string for deleted tombstones          |
 | `rich`       | `u32 len + blob`  | `Option<Vec<RichSpan>>` | Formatted text spans; absent when `len = 0`              |
 | `extra`      | `u32 len + JSON`  | `Option<String>`        | Optional metadata JSON; absent when `len = 0`            |
@@ -68,8 +71,9 @@ ID sequences remain intact.
 **BOT** — set by the server based on `users.is_bot`. The client never sends this flag;
 the server ignores it if present in a `SendMessage` command.
 
-**REPLY** — this message is a reply to another message. Quoted origin metadata lives
-in the `extra` JSON field (only parse when this flag is set):
+**REPLY** — this message is a reply to another message. The `reply_to_id` field
+contains the ID of the original message. Quoted origin metadata lives in the `extra`
+JSON field (only parse when this flag is set):
 ```json
 { "reply": { "chat_id": 123, "msg_id": 456, "sender_id": 789, "quote": "first 100 chars…" } }
 ```
@@ -88,20 +92,24 @@ All values are little-endian.
 ### MessageBatch
 
 ```
-┌─────────────┬──────────────────────────────────────┐
-│ count: u32  │ messages[count]                       │
-└─────────────┴──────────────────────────────────────┘
+┌───────────────┬─────────────┬──────────────────────────────────────┐
+│ has_more: u8  │ count: u32  │ messages[count]                       │
+└───────────────┴─────────────┴──────────────────────────────────────┘
 ```
 
-### Message — 35-byte fixed header + variable
+`has_more`: 1 = more messages exist beyond this batch, 0 = last page.
+
+### Message — 36-byte min fixed header + variable
 
 ```
- 0    4    8   12      20      28  29     31          35
- ┌────┬────┬───┬───────┬───────┬──┬──────┬───────────┬──────────────────┐
- │ id │chat│snd│crtd_at│upd_at │ki│flags │content_len│ content (UTF-8)  │
- │ u32│ u32│u32│  i64  │  i64  │u8│ u16  │    u32    │    N bytes       │
- └────┴────┴───┴───────┴───────┴──┴──────┴───────────┴──────────────────┘
+ 0    4    8   12      20      28  29     31  32                   36
+ ┌────┬────┬───┬───────┬───────┬──┬──────┬────────────────────────┬───────────┬──────────────────┐
+ │ id │chat│snd│crtd_at│upd_at │ki│flags │reply_to: u8 [+ u32]   │content_len│ content (UTF-8)  │
+ │ u32│ u32│u32│  i64  │  i64  │u8│ u16  │ 1 byte  [+ 4 bytes]   │    u32    │    N bytes       │
+ └────┴────┴───┴───────┴───────┴──┴──────┴────────────────────────┴───────────┴──────────────────┘
 ```
+
+`reply_to` byte: `0` = not a reply (1 byte), `1` = reply_to_id follows as `u32` (5 bytes).
 
 Followed by variable-length tail (each section absent when its `len = 0`):
 
@@ -114,6 +122,8 @@ Followed by variable-length tail (each section absent when its `len = 0`):
 
 `len = 0` means the field is absent — no bytes follow and no allocation is made.
 
+Timestamps are validated against codec range (see [codec.md](codec.md#timestamp-validation)).
+
 ### Rich Content Blob
 
 ```
@@ -122,39 +132,59 @@ Followed by variable-length tail (each section absent when its `len = 0`):
 └───────────┴───────────────────┘
 
 Span — 10 bytes fixed + optional meta:
-┌────────────┬──────────┬───────────┬──────────────────┐
-│ start: u32 │ end: u32 │ style: u16│ meta (if present)│
-└────────────┴──────────┴───────────┴──────────────────┘
+┌────────────┬──────────┬───────────┬──────────────────────────────┐
+│ start: u32 │ end: u32 │ style: u16│ meta_len: u32 + JSON (UTF-8) │
+└────────────┴──────────┴───────────┴──────────────────────────────┘
 ```
 
 `start`/`end` are byte offsets into the plain-text `content` string.
 
-Meta is appended when specific `style` bits are set:
+`meta_len = 0` — no meta for this span (14 bytes total: 10 fixed + 4 for meta_len).
 
-| Flag      | Meta                       |
-| --------- | -------------------------- |
-| `LINK`    | `url_len: u32` + UTF-8 URL |
-| `MENTION` | `user_id: u32`             |
+When `meta_len > 0`, meta is a JSON object. Keys depend on the `style` bits set:
+
+| Style bit    | Meta JSON key           | Example                          |
+| ------------ | ----------------------- | -------------------------------- |
+| `LINK`       | `"url": String`         | `{"url": "https://example.com"}` |
+| `MENTION`    | `"user_id": u32`        | `{"user_id": 42}`                |
+| `COLOR`      | `"rgba": u32`           | `{"rgba": 4278190335}`           |
+| `CODE_BLOCK` | `"lang": String`        | `{"lang": "rust"}`               |
+
+Multiple keys may be present when multiple style bits with meta are combined.
+Unknown keys must be tolerated (forward compatibility).
 
 ### RichStyle flags
 
 ```rust
 bitflags! {
     pub struct RichStyle: u16 {
-        const BOLD    = 0x0001;
-        const ITALIC  = 0x0002;
-        const CODE    = 0x0004; // inline code span
-        const STRIKE  = 0x0008;
-        const SPOILER = 0x0010;
-        const LINK    = 0x0020; // meta: url_len + URL
-        const MENTION = 0x0040; // meta: user_id: u32
-        const COLOR   = 0x0080;
-        // 0x0100+: reserved
+        // Inline styles (combinable)
+        const BOLD       = 0x0001;
+        const ITALIC     = 0x0002;
+        const UNDERLINE  = 0x0004;
+        const STRIKE     = 0x0008;
+        const SPOILER    = 0x0010;
+        const CODE       = 0x0020; // inline monospace `code`
+
+        // Styles with meta (combinable with inline)
+        const LINK       = 0x0040; // meta: {"url": "..."}
+        const MENTION    = 0x0080; // meta: {"user_id": u32}
+        const COLOR      = 0x0100; // meta: {"rgba": u32}
+
+        // Block-level (exclusive — overrides inline styles on this span)
+        const CODE_BLOCK = 0x0200; // meta: {"lang": "rust"}, see below
+        const BLOCKQUOTE = 0x0400; // > quoted text
+
+        // 0x0800–0x8000: reserved
     }
 }
 ```
 
-Multiple style bits may be combined on a single span (e.g. bold + italic).
+Multiple style bits may be combined on a single span (e.g. bold + italic + link).
+
+**Block-level semantics:** When `CODE_BLOCK` is set, the client ignores inline style
+bits (BOLD, ITALIC, etc.) on this span — code blocks render as-is. `BLOCKQUOTE` may
+contain nested inline-styled spans at different offsets within the quoted range.
 
 ## Extra JSON
 
@@ -164,7 +194,7 @@ keys (forward compatibility). Known conventions:
 | Key     | Present when    | Schema                                                                        |
 | ------- | --------------- | ----------------------------------------------------------------------------- |
 | `fwd`   | `FORWARDED` set | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32 }`                         |
-| `reply` | `REPLY` set     | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32, "text": "<= 100 bytes" }` |
+| `reply` | `REPLY` set     | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32, "quote": "<= 100 bytes" }` |
 
 ## Insertion (server-side)
 
@@ -223,12 +253,6 @@ updated_at TIMESTAMPTZ  NOT NULL,
 PRIMARY KEY (chat_id, id)
 ```
 
-`chats` table carries the per-chat ID counter:
-
-```sql
-last_msg_id  INTEGER  NOT NULL DEFAULT 0
-```
-
 ### SQLite (client — `chat_client_rs` repo)
 
 The client never generates message IDs — all IDs arrive from the server.
@@ -243,13 +267,9 @@ flags        INTEGER NOT NULL DEFAULT 0,
 content      TEXT    NOT NULL,
 rich_content BLOB,
 extra        TEXT,
-reply_to_id  INTEGER,        -- planned (threads milestone)
 updated_at   INTEGER NOT NULL,
 PRIMARY KEY (chat_id, id)
 ```
-
-`last_message_id` in the `chats` table doubles as the sync cursor:
-`WHERE chat_id = ? AND id > last_message_id` fetches all unseen messages after reconnect.
 
 ### Flags and permissions storage
 

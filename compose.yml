@@ -1,0 +1,56 @@
+# Development services for chat-rs.
+# Usage: docker compose up -d
+# Or:    cargo xtask dev up
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: chat-rs-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: chat
+      POSTGRES_PASSWORD: chat
+      POSTGRES_DB: chat_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp
+      - /run
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - fsync=off            # faster for dev, never use in prod
+      - -c
+      - synchronous_commit=off
+      - -c
+      - full_page_writes=off
+      - -c
+      - max_connections=100
+      - -c
+      - log_statement=all    # log all queries for debugging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chat -d chat_db"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Uncomment for Pro tier development:
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: chat-rs-redis
+  #   ports:
+  #     - "6379:6379"
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 2s
+  #     timeout: 5s
+  #     retries: 10
+  #   restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local

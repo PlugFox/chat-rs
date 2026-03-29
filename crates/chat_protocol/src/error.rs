@@ -47,6 +47,13 @@ pub enum CodecError {
         offset: usize,
     },
 
+    /// Structurally invalid data (e.g. trailing bytes after a sub-message).
+    #[error("invalid data: {reason}")]
+    InvalidData {
+        /// Human-readable description of the problem.
+        reason: &'static str,
+    },
+
     /// String length exceeds a protocol-defined limit.
     #[error("{field} too long: {len} bytes (max {max})")]
     StringTooLong {

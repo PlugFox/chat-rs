@@ -1,4 +1,4 @@
-/// Deep equality check for lists.
+/// Element-wise equality check for lists.
 bool listEquals<T>(List<T>? a, List<T>? b) {
   if (identical(a, b)) return true;
   if (a == null || b == null) return false;

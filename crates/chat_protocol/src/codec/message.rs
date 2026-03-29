@@ -96,7 +96,13 @@ pub fn decode_message(buf: &mut impl Buf) -> Result<Message, CodecError> {
     } else {
         ensure_remaining(buf, rich_len)?;
         let mut rich_buf = buf.copy_to_bytes(rich_len);
-        Some(decode_rich_content(&mut rich_buf)?)
+        let spans = decode_rich_content(&mut rich_buf)?;
+        if rich_buf.has_remaining() {
+            return Err(CodecError::InvalidData {
+                reason: "trailing bytes in rich content",
+            });
+        }
+        Some(spans)
     };
 
     // Extra JSON

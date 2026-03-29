@@ -1744,7 +1744,7 @@ int _hexVal(int c) {{\n\
 fn emit_util() -> String {
     let mut out = String::from(HEADER);
     out.push_str(
-        "\n/// Deep equality check for lists.\nbool listEquals<T>(List<T>? a, List<T>? b) {\n  \
+        "\n/// Element-wise equality check for lists.\nbool listEquals<T>(List<T>? a, List<T>? b) {\n  \
          if (identical(a, b)) return true;\n  \
          if (a == null || b == null) return false;\n  \
          if (a.length != b.length) return false;\n  \

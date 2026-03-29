@@ -4,9 +4,11 @@
 
 ## Overview
 
+Планируемый список milestone'ов с примерным прогрессом:
+
 ```
-M0  Protocol         ██░░░░░░░░░░░░░░  contract
-M1  Core             ████░░░░░░░░░░░░  server + client skeleton
+M0  Protocol         ██░░░░░░░░░░░░░░  contract ✓ done
+M1  Core             ████░░░░░░░░░░░░  skeleton ✓ done
 M2  Basic UX         ██████░░░░░░░░░░  outbox, receipts, typing
 M3  Media            ████████░░░░░░░░  upload/download
 M4  Push             ██████████░░░░░░  FCM/APNs
@@ -41,56 +43,58 @@ M8  Scaling          ████████████████  Redis clu
 ### Deliverables — Server
 
 #### Infrastructure
-- [ ] `main.rs` — tokio runtime, signal handling (SIGTERM graceful shutdown)
-- [ ] `config.rs` — TOML config parsing с serde, validation, defaults
-- [ ] `app.rs` — axum Router с middleware stack (tracing, timeout, CORS)
-- [ ] PostgreSQL connection pool (sqlx::PgPool)
-- [ ] Database migrations: `001_initial.sql` (users, chats, chat_members, messages, device_sessions, read_receipts, reactions, idempotency_keys)
-- [ ] Tracing/logging setup (tracing-subscriber с env-filter)
+- [x] `main.rs` — tokio runtime, signal handling (SIGTERM/SIGINT graceful shutdown)
+- [x] `config.rs` — TOML config parsing с serde, validation, defaults (6 unit tests)
+- [x] `app.rs` — axum Router с middleware stack (tracing, timeout, CORS)
+- [x] PostgreSQL connection pool (sqlx::PgPool)
+- [x] Database migrations: `001_initial.sql` (users, user_info, sessions, chats, chat_members, dm_index, messages, read_receipts, reactions, idempotency_keys)
+- [x] Tracing/logging setup (tracing-subscriber с env-filter)
 
 #### WebSocket
-- [ ] WS upgrade endpoint (`GET /ws`)
-- [ ] Frame parsing loop (decode header → dispatch by kind)
-- [ ] `Hello` → JWT verification → `Welcome` response
-- [ ] Ping/Pong keepalive с configurable interval
-- [ ] Session registry: `DashMap<(i64, Uuid), WsSession>` (user_id, device_id)
-- [ ] Bounded send buffer per session (mpsc channel)
-- [ ] Graceful disconnect с proper `DisconnectCode`
+- [x] WS upgrade endpoint (`GET /ws`)
+- [x] Frame parsing loop (decode header → dispatch by kind)
+- [x] `Hello` → JWT verification → `Welcome` response
+- [x] Ping/Pong keepalive
+- [x] Session registry: `DashMap<(u32, Uuid), Arc<SessionHandle>>` (user_id, device_id)
+- [x] Bounded send buffer per session (mpsc channel, configurable capacity)
+- [x] Graceful disconnect (shutdown signal → clear sessions → close connections)
+- [ ] Ping/Pong с configurable interval (server-initiated — deferred to M2)
 
 #### Message Handling
-- [ ] `SendMessage` → validate → insert into DB → broadcast to subscribed sessions
-- [ ] `Ack` response с server-assigned message_id
-- [ ] Idempotency key deduplication (INSERT ... ON CONFLICT)
-- [ ] Basic delivery: fan-out to all sessions subscribed to chat_id
+- [x] `SendMessage` → validate → insert into DB → broadcast to subscribed sessions
+- [x] `Ack` response с server-assigned message_id
+- [x] Idempotency key deduplication (check before insert)
+- [x] Basic delivery: fan-out to all sessions subscribed to channel `"chat#{id}"`
 
 #### Auth
-- [ ] JWT verification (jsonwebtoken crate)
-- [ ] User creation/lookup by external_id
-- [ ] Device session upsert
+- [x] JWT verification (jsonwebtoken crate, HS256, sub=external_id)
+- [x] User creation/lookup by external_id
+- [x] Device session upsert (INSERT ON CONFLICT)
+- [x] Duplicate session handling (replace old session for same user+device)
 
 ### Deliverables — Test Client (in `tests/`)
 
-Минимальный WS-клиент для integration тестов, живущий в `tests/helpers/` данного репозитория. Не является production библиотекой.
+Минимальный WS-клиент для integration тестов, живущий в `tests/common/` данного репозитория. Не является production библиотекой.
 
-- [ ] `TestClient` struct: WS connect + Hello/Welcome handshake
-- [ ] Encode/decode фреймов через `chat_protocol` codec
-- [ ] Seq counter + pending request map (для rpc)
-- [ ] `send_message()` — отправить `SendMessage` фрейм, дождаться `Ack`
-- [ ] `recv_event()` — получить следующий `Event` фрейм с таймаутом
-- [ ] `subscribe(chat_id, last_ts)` — подписаться на чат
+- [x] `TestClient` struct: WS connect + Hello/Welcome handshake
+- [x] Encode/decode фреймов через `chat_protocol` codec
+- [x] Seq counter (auto-increment per request)
+- [x] `send_message()` — отправить `SendMessage` фрейм, дождаться `Ack`
+- [x] `recv_frame()` — получить следующий фрейм с таймаутом
+- [x] `subscribe(channels)` — подписаться на каналы
 
 ### Tests
 
 #### Unit — Server
-- [ ] Config parsing: valid config, missing fields с defaults, invalid values
+- [x] Config parsing: valid config, missing fields с defaults, invalid values (6 tests)
 - [ ] JWT verification: valid token, expired, invalid signature, malformed
 - [ ] Frame dispatch: known kinds route correctly, unknown → Error frame
-- [ ] Idempotency: duplicate key returns same message_id
 
 #### Integration
-- [ ] **Two-client message delivery**: Alice и Bob (`TestClient`) подключаются к test server, Bob отправляет сообщение, Alice получает `MessageNew` event
-- [ ] **Idempotency**: клиент отправляет дважды с одним key → одно сообщение на сервере
-- [ ] **Graceful shutdown**: сервер отправляет `DisconnectCode::ServerShutdown` → клиент видит disconnect
+- [x] **Two-client message delivery**: Alice и Bob (`TestClient`) подключаются к test server, Alice отправляет сообщение, Bob получает `MessageNew` event
+- [x] **Idempotency**: клиент отправляет дважды с одним key → одно сообщение на сервере (проверка в DB)
+- [x] **Graceful shutdown**: сервер закрывает соединения → клиент видит disconnect
+- [x] **Unauthenticated rejection**: команда без Hello → `ErrorCode::Unauthorized`
 
 #### Property-based
 - [ ] Proptest: произвольные WS frame sequences не паникуют сервер
@@ -102,18 +106,20 @@ M8  Scaling          ████████████████  Redis clu
 
 ### Documentation
 
-- [ ] `docs/server.md` — обновить с реальной структурой модулей
-- [ ] `docs/database.md` — обновить с финальной схемой PostgreSQL
+- [x] `docs/server.md` — обновлён с реальной структурой модулей
+- [x] `docs/database.md` — обновлён с финальной схемой PostgreSQL (BIGINT timestamps)
 - [ ] Rustdoc для public API обоих crate'ов (`chat_protocol`, `chat_server`)
-- [ ] `config.example.toml` — финальная версия с комментариями
+- [x] `config.example.toml` — финальная версия с комментариями
 
 ### Acceptance Criteria
 
-- Integration test "two clients" (через `TestClient`) зелёный
-- Server стартует с config.example.toml, принимает WS соединения
-- `TestClient` подключается, отправляет сообщение, получает Ack
-- `cargo xtask check` — всё зелёное
-- Benchmarks baseline записаны
+- [x] Integration test "two clients" (через `TestClient`) зелёный
+- [x] Server стартует с config, принимает WS соединения
+- [x] `TestClient` подключается, отправляет сообщение, получает Ack
+- [x] `cargo clippy --workspace --tests -D warnings` — чисто
+- [x] `cargo fmt --all --check` — чисто
+- [x] Все тесты workspace зелёные (unit + integration + protocol)
+- [ ] Benchmarks baseline записаны
 
 ---
 

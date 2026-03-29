@@ -139,15 +139,17 @@ Search is server-only via PostgreSQL `tsvector/tsquery`. Client FTS5 was removed
 
 ### User ID Strategy
 
-Internal `u32` (stored as PostgreSQL `SERIAL` / `INTEGER`) for wire compactness + external `TEXT` for developer integration:
+Internal `u32` (stored as PostgreSQL `SERIAL` / `INTEGER`) for wire compactness + external `TEXT` for developer integration.
+
+All timestamps are stored as `BIGINT` (Unix seconds) to match the wire protocol's `i64` format without conversion:
 
 ```sql
 CREATE TABLE users (
     id          SERIAL PRIMARY KEY,            -- u32 in Rust; max ~2.1B (sufficient for target scale)
     external_id TEXT        NOT NULL UNIQUE,   -- opaque external auth identity
     flags       SMALLINT    NOT NULL DEFAULT 0, -- UserFlags (u16 stored as i16)
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at  BIGINT      NOT NULL,          -- Unix seconds
+    updated_at  BIGINT      NOT NULL           -- Unix seconds
 );
 ```
 
@@ -184,20 +186,20 @@ CREATE TABLE chats (
     title       TEXT,                          -- NULL for dm
     avatar_url  TEXT,
     last_msg_id INTEGER     NOT NULL DEFAULT 0,  -- u32 in Rust; per-chat message counter
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at  BIGINT      NOT NULL,          -- Unix seconds
+    updated_at  BIGINT      NOT NULL,          -- Unix seconds
 
     CONSTRAINT channel_requires_parent CHECK (kind != 2 OR parent_id IS NOT NULL),
     CONSTRAINT dm_no_parent            CHECK (kind != 0 OR parent_id IS NULL)
 );
 
 CREATE TABLE chat_members (
-    chat_id     INTEGER     NOT NULL REFERENCES chats(id),
-    user_id     INTEGER     NOT NULL,
+    chat_id     INTEGER     NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role        SMALLINT    NOT NULL DEFAULT 0,  -- ChatRole: 0=Member,1=Moderator,2=Admin,3=Owner
     permissions INTEGER,                         -- NULL = use role defaults; Permission (u32 as i32)
-    joined_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    joined_at   BIGINT      NOT NULL,          -- Unix seconds
+    updated_at  BIGINT      NOT NULL,          -- Unix seconds
     PRIMARY KEY (chat_id, user_id)
 );
 
@@ -242,10 +244,18 @@ RETURNING id;
 Concurrent inserts into the same chat are serialized by the row lock on `chats`;
 inserts into different chats are fully independent.
 
-### Compile-Time Checked Queries
+### Timestamp Strategy
 
-Via `sqlx::query!` macro. SQL errors are caught at compile time.
+All timestamps are stored as `BIGINT` (Unix seconds, `i64` in Rust). This matches the wire protocol format directly — no conversion between `TIMESTAMPTZ` and `i64` needed.
+
+Trade-off: loses PostgreSQL date/time functions (use `EXTRACT(EPOCH FROM NOW())` for current time in queries), but simplifies the data path and avoids timezone ambiguity.
+
+### SQL Queries
+
+Currently using runtime-checked queries (`sqlx::query_as`, `sqlx::query_scalar`). Migration to compile-time checked `sqlx::query!` with offline mode (`sqlx prepare` + `.sqlx/` directory) is planned.
 
 ```bash
-sqlx migrate run --database-url postgres://...
+# Run migrations
+cargo xtask dev up
+DATABASE_URL=postgres://chat:chat@localhost/chat_db sqlx migrate run --source crates/chat_server/migrations
 ```

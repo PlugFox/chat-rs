@@ -10,19 +10,19 @@ Messages are also addressed in fixed-size **chunks** of 64 (`CHUNK_SIZE`). See [
 
 ## Fields
 
-| Field        | Wire type         | Rust type               | Description                                              |
-| ------------ | ----------------- | ----------------------- | -------------------------------------------------------- |
-| `id`         | `u32`             | `u32`                   | Sequential per-chat ID; scoped to `chat_id`, starts at 1 |
-| `chat_id`    | `u32`             | `u32`                   | Chat this message belongs to                             |
-| `sender_id`  | `u32`             | `u32`                   | Internal user ID of the sender                           |
-| `created_at` | `i64`             | `i64`                   | Creation timestamp, Unix seconds (validated: 0 ≤ v < 2⁴¹)|
-| `updated_at` | `i64`             | `i64`                   | Last modification timestamp, Unix seconds (validated)    |
-| `kind`       | `u8`              | `MessageKind`           | Content type                                             |
-| `flags`      | `u16`             | `MessageFlags`          | Bitfield of message properties                           |
-| `reply_to_id`| `u8 flag + u32`   | `Option<u32>`           | Message being replied to; absent = not a reply           |
-| `content`    | `u32 len + UTF-8` | `String`                | Plain text; empty string for deleted tombstones          |
-| `rich`       | `u32 len + blob`  | `Option<Vec<RichSpan>>` | Formatted text spans; absent when `len = 0`              |
-| `extra`      | `u32 len + JSON`  | `Option<String>`        | Optional metadata JSON; absent when `len = 0`            |
+| Field         | Wire type         | Rust type               | Description                                               |
+| ------------- | ----------------- | ----------------------- | --------------------------------------------------------- |
+| `id`          | `u32`             | `u32`                   | Sequential per-chat ID; scoped to `chat_id`, starts at 1  |
+| `chat_id`     | `u32`             | `u32`                   | Chat this message belongs to                              |
+| `sender_id`   | `u32`             | `u32`                   | Internal user ID of the sender                            |
+| `created_at`  | `i64`             | `i64`                   | Creation timestamp, Unix seconds (validated: 0 ≤ v < 2⁴¹) |
+| `updated_at`  | `i64`             | `i64`                   | Last modification timestamp, Unix seconds (validated)     |
+| `kind`        | `u8`              | `MessageKind`           | Content type                                              |
+| `flags`       | `u16`             | `MessageFlags`          | Bitfield of message properties                            |
+| `reply_to_id` | `u8 flag + u32`   | `Option<u32>`           | Message being replied to; absent = not a reply            |
+| `content`     | `u32 len + UTF-8` | `String`                | Plain text; empty string for deleted tombstones           |
+| `rich`        | `u32 len + blob`  | `Option<Vec<RichSpan>>` | Formatted text spans; absent when `len = 0`               |
+| `extra`       | `u32 len + JSON`  | `Option<String>`        | Optional metadata JSON; absent when `len = 0`             |
 
 ## MessageKind
 
@@ -143,12 +143,12 @@ Span — 10 bytes fixed + optional meta:
 
 When `meta_len > 0`, meta is a JSON object. Keys depend on the `style` bits set:
 
-| Style bit    | Meta JSON key           | Example                          |
-| ------------ | ----------------------- | -------------------------------- |
-| `LINK`       | `"url": String`         | `{"url": "https://example.com"}` |
-| `MENTION`    | `"user_id": u32`        | `{"user_id": 42}`                |
-| `COLOR`      | `"rgba": u32`           | `{"rgba": 4278190335}`           |
-| `CODE_BLOCK` | `"lang": String`        | `{"lang": "rust"}`               |
+| Style bit    | Meta JSON key    | Example                          |
+| ------------ | ---------------- | -------------------------------- |
+| `LINK`       | `"url": String`  | `{"url": "https://example.com"}` |
+| `MENTION`    | `"user_id": u32` | `{"user_id": 42}`                |
+| `COLOR`      | `"rgba": u32`    | `{"rgba": 4278190335}`           |
+| `CODE_BLOCK` | `"lang": String` | `{"lang": "rust"}`               |
 
 Multiple keys may be present when multiple style bits with meta are combined.
 Unknown keys must be tolerated (forward compatibility).
@@ -191,9 +191,9 @@ contain nested inline-styled spans at different offsets within the quoted range.
 The `extra` field carries optional structured metadata. Clients must tolerate unknown
 keys (forward compatibility). Known conventions:
 
-| Key     | Present when    | Schema                                                                        |
-| ------- | --------------- | ----------------------------------------------------------------------------- |
-| `fwd`   | `FORWARDED` set | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32 }`                         |
+| Key     | Present when    | Schema                                                                         |
+| ------- | --------------- | ------------------------------------------------------------------------------ |
+| `fwd`   | `FORWARDED` set | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32 }`                          |
 | `reply` | `REPLY` set     | `{ "chat_id": u32, "msg_id": u32, "sender_id": u32, "quote": "<= 100 bytes" }` |
 
 ## Insertion (server-side)
